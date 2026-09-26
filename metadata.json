@@ -1,0 +1,8 @@
+{
+  "name": "Kebakar POS Sistem",
+  "description": "aplikasi POS multi-outlet responsif dengan sistem autentikasi, navigasi berbasis peran, dan manajemen akses yang aman.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

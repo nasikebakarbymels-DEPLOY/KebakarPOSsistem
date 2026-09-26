@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+/* Safe-Area iOS Support */
+@supports (padding: env(safe-area-inset-bottom)) {
+  /* Bottom navigation: beri jarak aman dari home indicator iPhone */
+  nav.fixed.bottom-0 {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Header global: beri jarak aman dari status bar / notch / dynamic island */
+  header.sticky.top-0 {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* Modals dan drawer bottom sheet */
+  .safe-area-bottom,
+  [role="dialog"] {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+}
+
+@media print {
+
+  body {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #digital-receipt-paper,
+  #digital-receipt-paper *,
+  #printable-receipt,
+  #printable-receipt * {
+    visibility: visible;
+  }
+
+  #digital-receipt-paper,
+  #printable-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: 80mm;
+    margin: 0 !important;
+    padding: 8px !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+}

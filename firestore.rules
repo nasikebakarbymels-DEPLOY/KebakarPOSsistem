@@ -1,0 +1,115 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && getUserData().role == 'super_admin';
+    }
+
+    function isOwner() {
+      return isAuthenticated() && getUserData().role == 'owner';
+    }
+
+    function isKasir() {
+      return isAuthenticated() && getUserData().role == 'kasir';
+    }
+
+    function hasAccessToOutlet(outletId) {
+      return isAuthenticated() && (
+        isSuperAdmin() ||
+        (isOwner() && outletId in getUserData().outletIds) ||
+        (isKasir() && outletId in getUserData().outletIds)
+      );
+    }
+
+    // Helper functions tambahan
+    function isOwnerOfOutlet(outletId) {
+      return isOwner() && outletId in getUserData().outletIds;
+    }
+
+    function getUserOutletIds() {
+      return getUserData().outletIds;
+    }
+
+    function hasCommonOutlet(userOutletIds, targetOutletIds) {
+      return userOutletIds.hasAny(targetOutletIds);
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId ||
+        isSuperAdmin() ||
+        (isOwner() && hasCommonOutlet(getUserOutletIds(), resource.data.outletIds))
+      );
+
+      allow create: if isSuperAdmin();
+
+      allow update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (
+          request.auth.uid == userId &&
+          request.resource.data.role == resource.data.role &&
+          request.resource.data.outletIds == resource.data.outletIds &&
+          request.resource.data.status == resource.data.status &&
+          request.resource.data.email == resource.data.email
+        ) ||
+        (
+          isOwner() &&
+          resource.data.role == 'kasir' &&
+          hasCommonOutlet(getUserOutletIds(), resource.data.outletIds) &&
+          request.resource.data.role == 'kasir' &&
+          getUserOutletIds().hasAll(request.resource.data.outletIds)
+        )
+      );
+
+      allow delete: if isSuperAdmin();
+    }
+
+    // Outlets collection
+    match /outlets/{outletId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || outletId in getUserData().outletIds);
+      allow create: if isSuperAdmin();
+      allow update: if isAuthenticated() && (
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasAny(['pinOwnerHash', 'pinOwnerSetAt']) &&
+          request.auth.uid in resource.data.ownerIds
+        ) ||
+        (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['pinOwnerHash', 'pinOwnerSetAt']) &&
+          (isSuperAdmin() || isOwnerOfOutlet(outletId))
+        )
+      );
+      allow delete: if isSuperAdmin();
+
+      // Subcollection Open Bill (Fase 7)
+      match /openBills/{billId} {
+        allow read: if hasAccessToOutlet(outletId);
+        allow create, update: if isAuthenticated() && (
+          (isOwner() && outletId in getUserData().outletIds) ||
+          (isKasir() && outletId in getUserData().outletIds)
+        ) && request.resource.data.outletId == outletId;
+        allow delete: if isAuthenticated() && (
+          (isOwner() && outletId in getUserData().outletIds) ||
+          (isKasir() && outletId in getUserData().outletIds)
+        );
+      }
+
+      // Subcollections di dalam outlet
+      match /{subcollection}/{docId} {
+        allow read: if hasAccessToOutlet(outletId);
+        allow create: if hasAccessToOutlet(outletId) && request.resource.data.outletId == outletId;
+        allow update: if hasAccessToOutlet(outletId) && request.resource.data.outletId == outletId;
+        allow delete: if hasAccessToOutlet(outletId);
+      }
+    }
+  }
+}
