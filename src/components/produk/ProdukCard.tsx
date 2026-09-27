@@ -245,7 +245,7 @@ export const ProdukCard: React.FC<ProdukCardProps> = ({
           <button
             type="button"
             onClick={() => onDelete(produk)}
-            className="p-2 rounded-xl text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition"
+            className="p-2 rounded-xl text-stone-400 hover:text-rose-600 active:text-rose-700 hover:bg-rose-50 active:bg-rose-100 transition"
             title="Hapus Produk"
           >
             <Trash2 className="w-4 h-4" />

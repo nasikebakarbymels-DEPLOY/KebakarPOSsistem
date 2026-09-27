@@ -24,15 +24,16 @@ interface ProdukDetailModalProps {
   onOpenEdit: (p: Produk) => void;
 }
 
-// Helper format biaya unit dengan desimal bila perlu (misal: Rp43,6/gram atau Rp43.600/porsi)
+// Helper format biaya unit dengan desimal bila perlu (misal: Rp40,042/gram atau Rp43.600/porsi)
 const formatBiayaUnit = (biaya: number, satuan: string): string => {
   if (!biaya || isNaN(biaya)) return `Rp0/${satuan}`;
   const isInteger = Number.isInteger(biaya);
+  const maxDecimals = satuan === 'gram' || satuan === 'ml' ? 3 : 2;
   const formattedVal = isInteger
     ? Math.round(biaya).toLocaleString('id-ID')
-    : Number(biaya.toFixed(1)).toLocaleString('id-ID', {
+    : biaya.toLocaleString('id-ID', {
         minimumFractionDigits: 1,
-        maximumFractionDigits: 1,
+        maximumFractionDigits: maxDecimals,
       });
   return `Rp${formattedVal}/${satuan}`;
 };

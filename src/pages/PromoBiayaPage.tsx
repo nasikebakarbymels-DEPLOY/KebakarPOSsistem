@@ -566,11 +566,11 @@ export const PromoBiayaPage: React.FC = () => {
       </div>
 
       {/* Segmented Tab Switcher */}
-      <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-stone-200/70 max-w-xl flex-wrap">
+      <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-stone-200/70 max-w-full overflow-x-auto">
         <button
           type="button"
           onClick={() => setActiveSegment('voucher')}
-          className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+          className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
             activeSegment === 'voucher'
               ? 'bg-white text-stone-900 shadow-xs'
               : 'text-stone-600 hover:text-stone-900'
@@ -583,7 +583,7 @@ export const PromoBiayaPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveSegment('biaya_lain')}
-          className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+          className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
             activeSegment === 'biaya_lain'
               ? 'bg-white text-stone-900 shadow-xs'
               : 'text-stone-600 hover:text-stone-900'
@@ -596,7 +596,7 @@ export const PromoBiayaPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveSegment('pin_owner')}
-          className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+          className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
             activeSegment === 'pin_owner'
               ? 'bg-white text-stone-900 shadow-xs'
               : 'text-stone-600 hover:text-stone-900'
@@ -609,7 +609,7 @@ export const PromoBiayaPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveSegment('log_approval')}
-          className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+          className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
             activeSegment === 'log_approval'
               ? 'bg-white text-stone-900 shadow-xs'
               : 'text-stone-600 hover:text-stone-900'

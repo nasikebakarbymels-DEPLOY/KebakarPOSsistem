@@ -52,7 +52,7 @@ export const BahanCard: React.FC<BahanCardProps> = ({
             </button>
             <button
               onClick={() => onDelete(bahan)}
-              className="p-1.5 rounded-xl text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition"
+              className="p-1.5 rounded-xl text-stone-400 hover:text-rose-600 active:text-rose-700 hover:bg-rose-50 active:bg-rose-100 transition"
               title="Hapus Bahan"
             >
               <Trash2 className="w-4 h-4" />

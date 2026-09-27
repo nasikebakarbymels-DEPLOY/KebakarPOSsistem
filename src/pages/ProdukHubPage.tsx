@@ -65,9 +65,9 @@ export const ProdukHubPage: React.FC<ProdukHubPageProps> = () => {
   }
 
   return (
-    <div className="w-full pb-24">
-      {/* Sticky Tab Navigator */}
-      <div className="px-4 pt-3 pb-2.5 bg-stone-100/90 backdrop-blur-xs sticky top-0 z-10 border-b border-stone-200/60 shadow-2xs">
+    <div className="w-full">
+      {/* Sticky Tab Navigator - diletakkan di bawah sticky header (top-[57px]) dengan solid background */}
+      <div className="px-4 pt-3 pb-2.5 bg-stone-100 sticky top-[57px] z-20 border-b border-stone-200/60 shadow-2xs">
         <div className="flex bg-stone-200/80 p-1 rounded-2xl gap-1 max-w-2xl mx-auto">
           {/* Tab 1: Menu & Resep (Cloud) */}
           <button
@@ -117,7 +117,7 @@ export const ProdukHubPage: React.FC<ProdukHubPageProps> = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4">
+      <div className="p-4 sm:p-6 w-full space-y-4">
         {/* Banner Status Cloud Aktif */}
         <div className="p-3 rounded-xl bg-orange-50/70 border border-orange-200/70 flex items-center justify-between gap-3 text-xs text-orange-900">
           <div className="flex items-center gap-2">

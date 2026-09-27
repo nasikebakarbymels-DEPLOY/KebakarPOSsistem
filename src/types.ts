@@ -42,7 +42,7 @@ export interface UserOutletRelation {
 export type ViewState = 'loading' | 'empty' | 'error' | 'ready';
 
 // Navigasi Berdasarkan Role
-export type OwnerTab = 'beranda' | 'produk' | 'promo_biaya' | 'log_approval' | 'kasir' | 'laporan' | 'lainnya';
+export type OwnerTab = 'beranda' | 'produk' | 'kasir' | 'laporan' | 'lainnya';
 export type KasirTab = 'kasir' | 'open_bill' | 'riwayat' | 'sync' | 'lainnya';
 export type SuperAdminTab = 'dashboard' | 'outlet' | 'users' | 'laporan' | 'lainnya';
 export type ActiveTab = OwnerTab | KasirTab | SuperAdminTab;

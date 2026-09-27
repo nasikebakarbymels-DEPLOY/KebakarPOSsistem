@@ -5,18 +5,29 @@ export const formatRupiah = (val?: number): string => {
   return `Rp${Math.round(val).toLocaleString('id-ID')}`;
 };
 
-// Formatter biaya per satuan dasar, mendukung desimal jika tidak bulat (contoh: Rp103,7 /ml)
-export const formatBiayaSatuan = (biaya?: number, satuan?: SatuanDasar | string): string => {
+// Formatter biaya per satuan dasar, mendukung 3 desimal untuk gram/ml agar presisi konsisten dengan HPP batch
+export const formatBiayaSatuan = (
+  biaya?: number,
+  satuan?: SatuanDasar | string,
+  forceDecimals?: number
+): string => {
   if (biaya === undefined || biaya === null || isNaN(biaya)) {
     return 'Belum ada biaya';
   }
   
   const isInteger = Number.isInteger(biaya);
+  const maxDecimals =
+    forceDecimals !== undefined
+      ? forceDecimals
+      : satuan === 'gram' || satuan === 'ml'
+      ? 3
+      : 2;
+
   const formattedVal = isInteger
     ? Math.round(biaya).toLocaleString('id-ID')
-    : Number(biaya.toFixed(1)).toLocaleString('id-ID', {
+    : biaya.toLocaleString('id-ID', {
         minimumFractionDigits: 1,
-        maximumFractionDigits: 1,
+        maximumFractionDigits: maxDecimals,
       });
 
   return `Rp${formattedVal} /${satuan || ''}`;

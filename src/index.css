@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: #f5f5f4;
+}
+
 /* Safe-Area iOS Support */
 @supports (padding: env(safe-area-inset-bottom)) {
   /* Bottom navigation: beri jarak aman dari home indicator iPhone */

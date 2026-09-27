@@ -276,9 +276,9 @@ export const MenuSegment: React.FC<MenuSegmentProps> = ({ outletId, userId }) =>
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
+      <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center flex-wrap">
         {/* Search */}
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-[200px]">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-400">
             <Search className="w-4 h-4" />
           </div>
@@ -300,46 +300,52 @@ export const MenuSegment: React.FC<MenuSegmentProps> = ({ outletId, userId }) =>
           )}
         </div>
 
-        {/* Filter Segmented Status */}
-        <div className="flex items-center p-1 bg-stone-100 rounded-xl border border-stone-200/80 shrink-0">
-          {(['semua', 'aktif', 'nonaktif'] as FilterStatus[]).map((st) => (
-            <button
-              key={st}
-              type="button"
-              onClick={() => setStatusFilter(st)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition capitalize ${
-                statusFilter === st
-                  ? 'bg-white text-stone-900 shadow-2xs'
-                  : 'text-stone-500 hover:text-stone-800'
-              }`}
-            >
-              {st}
-            </button>
-          ))}
+        {/* Filter Segmented Status dengan label */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[11px] font-bold text-stone-500 whitespace-nowrap">Status:</span>
+          <div className="flex items-center p-1 bg-stone-100 rounded-xl border border-stone-200/80 overflow-x-auto max-w-full">
+            {(['semua', 'aktif', 'nonaktif'] as FilterStatus[]).map((st) => (
+              <button
+                key={st}
+                type="button"
+                onClick={() => setStatusFilter(st)}
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition capitalize whitespace-nowrap shrink-0 ${
+                  statusFilter === st
+                    ? 'bg-white text-stone-900 shadow-2xs'
+                    : 'text-stone-500 hover:text-stone-800'
+                }`}
+              >
+                {st}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Filter Segmented Jenis */}
-        <div className="flex items-center p-1 bg-stone-100 rounded-xl border border-stone-200/80 shrink-0">
-          {(
-            [
-              { id: 'semua', label: 'Semua' },
-              { id: 'menu_jual', label: 'Menu Jual' },
-              { id: 'komponen', label: 'Komponen' },
-            ] as const
-          ).map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setJenisFilter(item.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
-                jenisFilter === item.id
-                  ? 'bg-white text-stone-900 shadow-2xs'
-                  : 'text-stone-500 hover:text-stone-800'
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
+        {/* Filter Segmented Jenis dengan label */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[11px] font-bold text-stone-500 whitespace-nowrap">Jenis:</span>
+          <div className="flex items-center p-1 bg-stone-100 rounded-xl border border-stone-200/80 overflow-x-auto max-w-full">
+            {(
+              [
+                { id: 'semua', label: 'Semua' },
+                { id: 'menu_jual', label: 'Menu Jual' },
+                { id: 'komponen', label: 'Komponen' },
+              ] as const
+            ).map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setJenisFilter(item.id)}
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap shrink-0 ${
+                  jenisFilter === item.id
+                    ? 'bg-white text-stone-900 shadow-2xs'
+                    : 'text-stone-500 hover:text-stone-800'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Filter Kategori Chips / Select jika banyak */}
@@ -459,13 +465,18 @@ export const MenuSegment: React.FC<MenuSegmentProps> = ({ outletId, userId }) =>
                   <div className="space-y-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <h3 className="text-sm font-bold text-stone-900 leading-snug">{p.nama}</h3>
-                      {p.jenis === 'komponen' && (
-                        <span className="inline-flex px-2 py-0.2 rounded-md text-[10px] font-bold border bg-amber-50 text-amber-800 border-amber-300">
-                          Komponen
-                        </span>
-                      )}
+                      {/* SATU badge jenis per kartu (Komponen vs Menu Jual) */}
                       <span
-                        className={`inline-flex px-2 py-0.2 rounded-md text-[10px] font-bold border ${
+                        className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                          p.jenis === 'komponen'
+                            ? 'bg-amber-50 text-amber-800 border-amber-300'
+                            : 'bg-blue-50 text-blue-800 border-blue-200'
+                        }`}
+                      >
+                        {p.jenis === 'komponen' ? 'Komponen' : 'Menu Jual'}
+                      </span>
+                      <span
+                        className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold border ${
                           p.aktif
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
                             : 'bg-stone-100 text-stone-600 border-stone-200'
@@ -476,10 +487,23 @@ export const MenuSegment: React.FC<MenuSegmentProps> = ({ outletId, userId }) =>
                     </div>
 
                     <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
-                      <span className="bg-stone-100 text-stone-700 px-1.5 py-0.5 rounded font-medium">
-                        {p.kategori || 'Umum'}
-                      </span>
-                      {p.sku && <span> • SKU: {p.sku}</span>}
+                      {p.kategori &&
+                        p.kategori.toLowerCase() !== 'komponen' &&
+                        p.kategori.toLowerCase() !== 'menu jual' && (
+                          <span className="bg-stone-100 text-stone-700 px-1.5 py-0.5 rounded font-medium">
+                            {p.kategori}
+                          </span>
+                        )}
+                      {p.sku && (
+                        <span>
+                          {p.kategori &&
+                          p.kategori.toLowerCase() !== 'komponen' &&
+                          p.kategori.toLowerCase() !== 'menu jual'
+                            ? ' • '
+                            : ''}
+                          SKU: {p.sku}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -505,7 +529,7 @@ export const MenuSegment: React.FC<MenuSegmentProps> = ({ outletId, userId }) =>
                       type="button"
                       disabled={checkingDeleteId === p.id}
                       onClick={() => handleRequestDelete(p)}
-                      className="p-1.5 rounded-lg text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition disabled:opacity-50"
+                      className="p-1.5 rounded-lg text-stone-400 hover:text-rose-600 active:text-rose-700 hover:bg-rose-50 active:bg-rose-100 transition disabled:opacity-50"
                       title="Hapus Menu"
                     >
                       {checkingDeleteId === p.id ? (
@@ -528,11 +552,12 @@ export const MenuSegment: React.FC<MenuSegmentProps> = ({ outletId, userId }) =>
                           : 1;
                       const outSat = p.hasilProduksi?.satuan || 'porsi';
                       const biayaUnit = totalHpp / outJml;
+                      const maxDecimals = outSat === 'gram' || outSat === 'ml' ? 3 : 2;
                       const formattedBiaya = Number.isInteger(biayaUnit)
                         ? formatRupiah(biayaUnit)
                         : `Rp${biayaUnit.toLocaleString('id-ID', {
                             minimumFractionDigits: 1,
-                            maximumFractionDigits: 2,
+                            maximumFractionDigits: maxDecimals,
                           })}`;
 
                       return (

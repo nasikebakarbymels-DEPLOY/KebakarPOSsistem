@@ -183,7 +183,7 @@ export const LaporanPage: React.FC = () => {
           )}
 
           {/* Segmented Filter Periode */}
-          <div className="flex items-center p-1 bg-stone-100 rounded-xl border border-stone-200/80 shrink-0">
+          <div className="flex items-center p-1 bg-stone-100 rounded-xl border border-stone-200/80 overflow-x-auto max-w-full">
             {(
               [
                 { id: 'hari', label: 'Hari Ini' },
@@ -196,7 +196,7 @@ export const LaporanPage: React.FC = () => {
                 key={tab.id}
                 type="button"
                 onClick={() => setPeriode(tab.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap shrink-0 ${
                   periode === tab.id
                     ? 'bg-white text-stone-900 shadow-2xs'
                     : 'text-stone-500 hover:text-stone-800'

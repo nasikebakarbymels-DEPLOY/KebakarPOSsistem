@@ -347,7 +347,7 @@ export const BahanSegment: React.FC<BahanSegmentProps> = ({ outletId, userId }) 
                       type="button"
                       disabled={checkingDeleteId === bahan.id}
                       onClick={() => handleRequestDelete(bahan)}
-                      className="p-1.5 rounded-lg text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition disabled:opacity-50"
+                      className="p-1.5 rounded-lg text-stone-400 hover:text-rose-600 active:text-rose-700 hover:bg-rose-50 active:bg-rose-100 transition disabled:opacity-50"
                       title="Hapus Bahan"
                     >
                       {checkingDeleteId === bahan.id ? (

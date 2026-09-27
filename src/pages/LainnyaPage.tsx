@@ -25,14 +25,15 @@ export const LainnyaPage: React.FC = () => {
   // Untuk super_admin dan kasir, tab Promo & Biaya tidak dirender sama sekali
   const availableSegments: {
     id: LainnyaSegment;
-    label: string;
+    labelShort: string;
+    labelFull: string;
     icon: React.ComponentType<{ className?: string }>;
   }[] = [
-    { id: 'printer', label: 'Printer Bluetooth', icon: Printer },
+    { id: 'printer', labelShort: 'Printer', labelFull: 'Printer Bluetooth', icon: Printer },
     ...(user.role === 'owner'
-      ? [{ id: 'promo_biaya' as LainnyaSegment, label: 'Promo & Biaya', icon: TicketPercent }]
+      ? [{ id: 'promo_biaya' as LainnyaSegment, labelShort: 'Promo', labelFull: 'Promo & Biaya', icon: TicketPercent }]
       : []),
-    { id: 'tentang', label: 'Tentang Aplikasi', icon: Info },
+    { id: 'tentang', labelShort: 'Tentang', labelFull: 'Tentang Aplikasi', icon: Info },
   ];
 
   const isSegmentAllowed = availableSegments.some((s) => s.id === activeSegment);
@@ -52,9 +53,13 @@ export const LainnyaPage: React.FC = () => {
         </p>
       </div>
 
-      {/* Segmented Control Selector */}
+      {/* Segmented Control Selector: Grid 3 kolom tidak boleh meluber */}
       {availableSegments.length > 1 && (
-        <div className="bg-stone-200/70 p-1 rounded-2xl flex gap-1">
+        <div
+          className={`w-full p-1 bg-stone-200/80 rounded-xl border border-stone-300/70 grid ${
+            availableSegments.length === 3 ? 'grid-cols-3' : 'grid-cols-2'
+          } gap-1`}
+        >
           {availableSegments.map((segment) => {
             const Icon = segment.icon;
             const isActive = currentSegment === segment.id;
@@ -65,14 +70,17 @@ export const LainnyaPage: React.FC = () => {
                 type="button"
                 id={`tab-lainnya-${segment.id}`}
                 onClick={() => setActiveSegment(segment.id)}
-                className={`flex-1 py-2 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                className={`px-1 py-2 rounded-lg text-[11px] sm:text-xs font-bold leading-tight flex flex-col items-center justify-center gap-1 text-center transition-all ${
                   isActive
                     ? 'bg-white text-stone-950 shadow-xs'
                     : 'text-stone-600 hover:text-stone-900'
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-orange-600' : 'text-stone-400'}`} />
-                <span className="truncate">{segment.label}</span>
+                <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${isActive ? 'text-orange-600' : 'text-stone-400'}`} />
+                <span className="leading-tight text-center">
+                  <span className="sm:hidden">{segment.labelShort}</span>
+                  <span className="hidden sm:inline">{segment.labelFull}</span>
+                </span>
               </button>
             );
           })}

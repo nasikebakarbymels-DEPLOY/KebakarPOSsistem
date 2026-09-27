@@ -13,11 +13,15 @@ import {
   UtensilsCrossed,
   Tag,
   Percent,
+  ChevronDown,
+  ChevronUp,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { Produk, Bahan, ItemResep, JenisProduk } from '../../types';
 import { produkCloudService, hitungHargaNeto } from '../../services/cloud/produkCloudService';
 import { hppCloudService, KalkulasiHPP, HppCalculationCache } from '../../services/cloud/hppCloudService';
 import { formatRupiah, formatBiayaSatuan } from '../../utils/formatters';
+import { ItemPickerSheet, ItemPickerOption, ItemPickerTab } from '../common/ItemPickerSheet';
 
 interface ProdukFormModalProps {
   isOpen: boolean;
@@ -70,6 +74,19 @@ export const ProdukFormModal: React.FC<ProdukFormModalProps> = ({
   // Live Kalkulasi HPP State
   const [liveKalkulasi, setLiveKalkulasi] = useState<KalkulasiHPP | null>(null);
   const [isCalculatingHpp, setIsCalculatingHpp] = useState(false);
+
+  // State ItemPickerSheet & Simulasi Biaya Expand/Collapse (Tugas 1 & 2)
+  const [pickerState, setPickerState] = useState<{
+    isOpen: boolean;
+    mode: 'add' | 'edit';
+    rowId?: string;
+    tab: 'bahan' | 'sub_produk';
+  }>({
+    isOpen: false,
+    mode: 'add',
+    tab: 'bahan',
+  });
+  const [isSimulasiExpanded, setIsSimulasiExpanded] = useState(false);
 
   // Deteksi jenis asli pada mode edit untuk warning perubahan harga jual
   const originalJenis: JenisProduk = useMemo(() => {
@@ -265,21 +282,183 @@ export const ProdukFormModal: React.FC<ProdukFormModalProps> = ({
     return liveHargaNeto < liveKalkulasi.hpp;
   }, [jenis, liveKalkulasi?.hpp, tipeDiskon, liveDiskonNominal, liveHargaNeto]);
 
+  // Deteksi Baris Resep Duplikat (item sama lebih dari satu)
+  const duplicateInfo = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of resepRows) {
+      if (!r.refId) continue;
+      const key = `${r.tipe}:${r.refId}`;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    let excessCount = 0;
+    for (const count of counts.values()) {
+      if (count > 1) {
+        excessCount += count - 1;
+      }
+    }
+    return { hasDuplicate: excessCount > 0, count: excessCount };
+  }, [resepRows]);
+
+  // Handler Gabungkan Baris Duplikat (menjumlahkan takaran ke baris pertama & hapus sisanya)
+  const handleMergeDuplicates = () => {
+    const mergedMap = new Map<string, FormResepRow>();
+    const newRows: FormResepRow[] = [];
+
+    for (const row of resepRows) {
+      if (!row.refId) {
+        newRows.push(row);
+        continue;
+      }
+      const key = `${row.tipe}:${row.refId}`;
+      if (!mergedMap.has(key)) {
+        const cloned = { ...row };
+        mergedMap.set(key, cloned);
+        newRows.push(cloned);
+      } else {
+        const firstRow = mergedMap.get(key)!;
+        const currentQty =
+          typeof firstRow.jumlah === 'number'
+            ? firstRow.jumlah
+            : parseFloat(String(firstRow.jumlah)) || 0;
+        const additionalQty =
+          typeof row.jumlah === 'number'
+            ? row.jumlah
+            : parseFloat(String(row.jumlah)) || 0;
+        firstRow.jumlah = Math.round((currentQty + additionalQty) * 1000) / 1000;
+      }
+    }
+
+    setResepRows(newRows);
+  };
+
+  // Tabs ItemPickerSheet
+  const pickerTabs: ItemPickerTab[] = useMemo(
+    () => [
+      { id: 'bahan', label: 'Bahan Baku', count: allBahan.length },
+      { id: 'sub_produk', label: 'Sub-Produk', count: candidateSubProduk.length },
+    ],
+    [allBahan.length, candidateSubProduk.length]
+  );
+
+  // Items untuk ItemPickerSheet
+  // Mode tambah: item yang sudah dipakai baris lain disabled berlabel "sudah dipakai".
+  // Mode ganti: item baris itu sendiri tidak disabled, item baris lain tetap disabled.
+  const pickerItems: ItemPickerOption[] = useMemo(() => {
+    if (pickerState.tab === 'bahan') {
+      return allBahan.map((b) => {
+        const isUsedInOtherRow = resepRows.some((r) => {
+          if (pickerState.mode === 'edit' && r.id === pickerState.rowId) {
+            return false;
+          }
+          return r.tipe === 'bahan' && r.refId === b.id;
+        });
+
+        return {
+          id: b.id,
+          label: b.nama,
+          sublabel: `Acuan: ${formatBiayaSatuan(b.hargaPerSatuanDasar, b.satuanDasar)} · Satuan: ${b.satuanDasar}`,
+          badge: 'Bahan Baku',
+          badgeColor: 'orange',
+          disabled: isUsedInOtherRow,
+          disabledLabel: 'sudah dipakai',
+        };
+      });
+    } else {
+      return candidateSubProduk.map((p) => {
+        const isUsedInOtherRow = resepRows.some((r) => {
+          if (pickerState.mode === 'edit' && r.id === pickerState.rowId) {
+            return false;
+          }
+          return r.tipe === 'sub_produk' && r.refId === p.id;
+        });
+
+        const outputStr = p.hasilProduksi
+          ? `${p.hasilProduksi.jumlah} ${p.hasilProduksi.satuan}`
+          : '1 porsi';
+
+        return {
+          id: p.id,
+          label: p.nama,
+          sublabel: `Output: ${outputStr} · Kategori: ${p.kategori || '-'}`,
+          badge: 'Sub-Produk',
+          badgeColor: 'purple',
+          disabled: isUsedInOtherRow,
+          disabledLabel: 'sudah dipakai',
+        };
+      });
+    }
+  }, [
+    pickerState.tab,
+    pickerState.mode,
+    pickerState.rowId,
+    allBahan,
+    candidateSubProduk,
+    resepRows,
+  ]);
+
+  // Handler onSelect dari ItemPickerSheet
+  const handlePickerSelect = (selectedId: string) => {
+    if (pickerState.mode === 'add') {
+      if (pickerState.tab === 'bahan') {
+        const selectedBahan = allBahan.find((b) => b.id === selectedId);
+        const newRow: FormResepRow = {
+          id: `row-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          tipe: 'bahan',
+          refId: selectedId,
+          jumlah: 1,
+          satuan: selectedBahan ? selectedBahan.satuanDasar : 'gram',
+        };
+        setResepRows((prev) => [...prev, newRow]);
+      } else {
+        const selectedSub = candidateSubProduk.find((p) => p.id === selectedId);
+        const defaultSat = getSubDefaultSatuan(selectedSub);
+        const newRow: FormResepRow = {
+          id: `row-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          tipe: 'sub_produk',
+          refId: selectedId,
+          jumlah: 1,
+          satuan: defaultSat,
+        };
+        setResepRows((prev) => [...prev, newRow]);
+      }
+    } else if (pickerState.mode === 'edit' && pickerState.rowId) {
+      setResepRows((prev) =>
+        prev.map((r) => {
+          if (r.id !== pickerState.rowId) return r;
+          if (pickerState.tab === 'bahan') {
+            const targetBahan = allBahan.find((b) => b.id === selectedId);
+            return {
+              ...r,
+              tipe: 'bahan',
+              refId: selectedId,
+              satuan: targetBahan ? targetBahan.satuanDasar : r.satuan,
+            };
+          } else {
+            const targetSub = candidateSubProduk.find((p) => p.id === selectedId);
+            const defaultSat = getSubDefaultSatuan(targetSub);
+            return {
+              ...r,
+              tipe: 'sub_produk',
+              refId: selectedId,
+              satuan: defaultSat,
+            };
+          }
+        })
+      );
+    }
+  };
+
   // Handler Tambah Baris Bahan
   const handleAddBahanRow = () => {
     if (allBahan.length === 0) {
       setErrorMsg('Belum ada bahan baku terdaftar di outlet. Tambahkan bahan terlebih dahulu.');
       return;
     }
-    const firstBahan = allBahan[0];
-    const newRow: FormResepRow = {
-      id: `row-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      tipe: 'bahan',
-      refId: firstBahan.id,
-      jumlah: 1,
-      satuan: firstBahan.satuanDasar,
-    };
-    setResepRows((prev) => [...prev, newRow]);
+    setPickerState({
+      isOpen: true,
+      mode: 'add',
+      tab: 'bahan',
+    });
   };
 
   // Handler Tambah Baris Sub-Produk
@@ -288,16 +467,11 @@ export const ProdukFormModal: React.FC<ProdukFormModalProps> = ({
       setErrorMsg('Belum ada produk lain yang dapat dijadikan sub-resep.');
       return;
     }
-    const firstSub = candidateSubProduk[0];
-    const defaultSat = getSubDefaultSatuan(firstSub);
-    const newRow: FormResepRow = {
-      id: `row-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      tipe: 'sub_produk',
-      refId: firstSub.id,
-      jumlah: 1,
-      satuan: defaultSat,
-    };
-    setResepRows((prev) => [...prev, newRow]);
+    setPickerState({
+      isOpen: true,
+      mode: 'add',
+      tab: 'sub_produk',
+    });
   };
 
   // Hapus Baris
@@ -566,13 +740,14 @@ export const ProdukFormModal: React.FC<ProdukFormModalProps> = ({
     }
   };
 
-  // Helper format biaya unit (misal: Rp43,6/gram atau Rp43.600/porsi)
+  // Helper format biaya unit (misal: Rp40,042/gram atau Rp43.600/porsi)
   const formatBiayaUnit = (biaya: number, satuan: string): string => {
     if (!biaya || isNaN(biaya) || biaya <= 0) return `Rp0/${satuan}`;
     const isInteger = Number.isInteger(biaya);
+    const maxDecimals = satuan === 'gram' || satuan === 'ml' ? 3 : 2;
     const formattedNominal = isInteger
       ? formatRupiah(biaya)
-      : `Rp${biaya.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}`;
+      : `Rp${biaya.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: maxDecimals })}`;
     return `${formattedNominal}/${satuan}`;
   };
 
@@ -1024,36 +1199,31 @@ export const ProdukFormModal: React.FC<ProdukFormModalProps> = ({
                   Resep mendukung bahan baku mentah dan sub-produk racikan bertingkat
                 </p>
               </div>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={handleAddBahanRow}
-                  disabled={isSubmitting}
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-bold border border-orange-200 transition"
-                >
-                  <Package className="w-3.5 h-3.5" />
-                  <span>+ Bahan</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleAddSubProdukRow}
-                  disabled={isSubmitting}
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold border border-purple-200 transition"
-                >
-                  <Layers className="w-3.5 h-3.5" />
-                  <span>+ Sub-Produk</span>
-                </button>
-              </div>
             </div>
 
-            {/* List Baris Resep */}
+            {/* Banner Duplikat Baris (Mode Edit / Deteksi Otomatis) */}
+            {duplicateInfo.hasDuplicate && (
+              <div className="p-2.5 sm:p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 flex items-center justify-between gap-2 animate-in fade-in">
+                <div className="flex items-center gap-2 text-xs">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Ada {duplicateInfo.count} baris duplikat.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleMergeDuplicates}
+                  className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition shrink-0 active:scale-95 shadow-2xs"
+                >
+                  Gabungkan
+                </button>
+              </div>
+            )}
+
+            {/* List Baris Resep Ringkas Dua Tingkat */}
             {resepRows.length === 0 ? (
               <div className="p-4 rounded-xl border border-dashed border-stone-200 text-center bg-stone-50/50">
                 <p className="text-xs text-stone-400">
-                  Produk ini belum memiliki takaran resep. Klik <strong>+ Bahan</strong> atau{' '}
-                  <strong>+ Sub-Produk</strong> di atas untuk menambahkan racikan.
+                  Produk ini belum memiliki takaran resep. Ketuk <strong>+ Bahan</strong> atau{' '}
+                  <strong>+ Sub-Produk</strong> di bilah bawah untuk menambahkan racikan.
                 </p>
               </div>
             ) : (
@@ -1067,102 +1237,81 @@ export const ProdukFormModal: React.FC<ProdukFormModalProps> = ({
                     ? candidateSubProduk.find((p) => p.id === row.refId)
                     : null;
 
-                  // Hitung detailIndex per baris sebagai jumlah baris SEBELUMNYA yang memiliki refId tidak kosong
+                  // Hitung detailIndex per baris
                   const detailIndex = resepRows.slice(0, idx).filter((r) => Boolean(r.refId)).length;
                   const rowDetail = row.refId ? liveKalkulasi?.itemsDetail?.[detailIndex] : undefined;
                   const subtotalBiaya = rowDetail?.subtotalBiaya ?? 0;
                   const hasBiaya = rowDetail ? rowDetail.hasBiaya : true;
 
+                  const itemName = isBahan
+                    ? selectedBahan?.nama || 'Pilih Bahan Baku'
+                    : selectedSub?.nama || 'Pilih Sub-Produk';
+
+                  const itemSubtext = isBahan
+                    ? selectedBahan
+                      ? `Acuan: ${formatBiayaSatuan(selectedBahan.hargaPerSatuanDasar, selectedBahan.satuanDasar)}`
+                      : ''
+                    : selectedSub?.hasilProduksi
+                    ? `Output: ${selectedSub.hasilProduksi.jumlah} ${selectedSub.hasilProduksi.satuan}`
+                    : '';
+
                   return (
                     <div
                       key={row.id}
-                      className="p-3 rounded-xl border border-stone-200 bg-white shadow-2xs space-y-2"
+                      className="p-3 rounded-2xl border border-stone-200 bg-white shadow-2xs space-y-2 hover:border-stone-300 transition"
                     >
+                      {/* Tingkat 1: Nama Item + Biaya Baris */}
                       <div className="flex items-center justify-between gap-2">
-                        {/* Type Switcher Tag */}
-                        <div className="flex items-center gap-1.5">
+                        <div className="min-w-0 flex items-center gap-2 flex-wrap flex-1">
                           <span
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border shrink-0 ${
                               isBahan
                                 ? 'bg-orange-50 text-orange-800 border-orange-200'
                                 : 'bg-purple-50 text-purple-800 border-purple-200'
                             }`}
                           >
                             {isBahan ? <Package className="w-3 h-3" /> : <Layers className="w-3 h-3" />}
-                            <span>{isBahan ? 'Bahan Baku' : 'Sub-Produk'}</span>
+                            <span>{isBahan ? 'Bahan' : 'Sub'}</span>
                           </span>
 
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleRowTypeChange(row.id, isBahan ? 'sub_produk' : 'bahan')
-                            }
-                            className="text-[10px] text-stone-400 hover:text-stone-700 underline"
-                          >
-                            Ganti ke {isBahan ? 'Sub-Produk' : 'Bahan'}
-                          </button>
-                        </div>
+                          <span className="text-xs sm:text-sm font-bold text-stone-900 truncate">
+                            {itemName}
+                          </span>
 
-                        {/* Tombol Hapus Baris */}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveRow(row.id)}
-                          className="p-1 rounded-md text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition"
-                          title="Hapus baris resep"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      {/* Dropdown & Input Jumlah */}
-                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-                        {/* Dropdown Item */}
-                        <div className="sm:col-span-7">
-                          {isBahan ? (
-                            <select
-                              value={row.refId}
-                              onChange={(e) => handleRowItemChange(row.id, e.target.value)}
-                              className="w-full px-2.5 py-1.5 rounded-lg text-xs border border-stone-200 focus:outline-none focus:ring-1 focus:ring-orange-500 bg-white"
-                            >
-                              {allBahan.map((b) => (
-                                <option key={b.id} value={b.id}>
-                                  {b.nama} (Acuan: {formatBiayaSatuan(b.hargaPerSatuanDasar, b.satuanDasar)})
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <select
-                              value={row.refId}
-                              onChange={(e) => handleRowItemChange(row.id, e.target.value)}
-                              className="w-full px-2.5 py-1.5 rounded-lg text-xs border border-stone-200 focus:outline-none focus:ring-1 focus:ring-purple-500 bg-white"
-                            >
-                              {candidateSubProduk.map((p) => {
-                                const outputText = p.hasilProduksi
-                                  ? `output: ${p.hasilProduksi.jumlah} ${p.hasilProduksi.satuan}`
-                                  : 'output: 1 porsi';
-                                return (
-                                  <option key={p.id} value={p.id}>
-                                    {p.nama} ({outputText})
-                                  </option>
-                                );
-                              })}
-                            </select>
+                          {itemSubtext && (
+                            <span className="text-[10px] text-stone-400 font-medium hidden sm:inline">
+                              ({itemSubtext})
+                            </span>
                           )}
                         </div>
 
-                        {/* Input Jumlah & Satuan */}
-                        <div className="sm:col-span-5 flex items-center gap-1.5">
+                        <div className="shrink-0 text-right">
+                          <span className="text-xs sm:text-sm font-black text-stone-900 font-mono">
+                            {formatRupiah(subtotalBiaya)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Tingkat 2: Input Takaran Kecil + Satuan + Tombol Ikon Ganti + Tombol Hapus */}
+                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-stone-100">
+                        <div className="flex items-center gap-1.5">
                           <input
                             type="number"
                             min="0.01"
                             step="any"
                             value={row.jumlah}
+                            onClick={(e) => e.stopPropagation()}
+                            onFocus={(e) => e.stopPropagation()}
                             onChange={(e) => handleRowJumlahChange(row.id, e.target.value)}
                             placeholder="Qty"
-                            className="w-20 px-2.5 py-1.5 rounded-lg text-xs border border-stone-200 focus:outline-none focus:ring-1 focus:ring-orange-500 bg-white font-semibold text-center"
+                            className="w-20 px-2 py-1 rounded-lg text-xs border border-stone-200 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 bg-stone-50/70 font-bold text-center text-stone-900"
                           />
+
                           {isBahan ? (
-                            <span className="text-xs font-semibold text-stone-500 shrink-0">
+                            <span
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-xs font-bold text-stone-600 px-1"
+                            >
                               {row.satuan}
                             </span>
                           ) : (
@@ -1177,8 +1326,9 @@ export const ProdukFormModal: React.FC<ProdukFormModalProps> = ({
                                 <select
                                   value={row.satuan}
                                   disabled={isSubmitting || isLocked}
+                                  onClick={(e) => e.stopPropagation()}
                                   onChange={(e) => handleRowSatuanChange(row.id, e.target.value)}
-                                  className="px-2 py-1 rounded-lg text-xs border border-stone-200 bg-white font-semibold text-stone-700 disabled:bg-stone-100 disabled:text-stone-500 shrink-0 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                  className="px-2 py-1 rounded-lg text-xs border border-stone-200 bg-stone-50 font-bold text-stone-700 disabled:bg-stone-100 disabled:text-stone-400 shrink-0 focus:outline-none focus:ring-1 focus:ring-purple-500"
                                 >
                                   {subSatuanOptions.map((opt) => (
                                     <option key={opt} value={opt}>
@@ -1189,18 +1339,47 @@ export const ProdukFormModal: React.FC<ProdukFormModalProps> = ({
                               );
                             })()
                           )}
+                        </div>
 
-                          {/* Subtotal Biaya Baris Live */}
-                          <div className="flex-1 text-right text-xs font-bold text-stone-800">
-                            {formatRupiah(subtotalBiaya)}
-                          </div>
+                        <div className="flex items-center gap-1">
+                          {/* Tombol Ikon Ganti: membuka ItemPickerSheet mode ganti */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPickerState({
+                                isOpen: true,
+                                mode: 'edit',
+                                rowId: row.id,
+                                tab: row.tipe,
+                              });
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold text-stone-600 hover:text-stone-900 bg-stone-100 hover:bg-stone-200 active:scale-95 transition"
+                            title="Ganti item bahan / sub-produk"
+                          >
+                            <ArrowLeftRight className="w-3.5 h-3.5 text-stone-500" />
+                            <span>Ganti</span>
+                          </button>
+
+                          {/* Tombol Hapus Baris */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveRow(row.id);
+                            }}
+                            className="p-1.5 rounded-lg text-stone-400 hover:text-rose-600 hover:bg-rose-50 active:scale-95 transition"
+                            title="Hapus baris resep"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
 
                       {/* Warning jika item belum punya biaya */}
                       {!hasBiaya && (
-                        <div className="text-[10px] text-amber-700 flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3 text-amber-600" />
+                        <div className="text-[10px] text-amber-700 flex items-center gap-1 pt-0.5">
+                          <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
                           <span>Biaya acuan item ini masih Rp0. HPP belum akurat.</span>
                         </div>
                       )}
@@ -1210,112 +1389,186 @@ export const ProdukFormModal: React.FC<ProdukFormModalProps> = ({
               </div>
             )}
 
-            {/* ================= PANEL LIVE HPP & MARGIN ================= */}
-            <div className="p-4 rounded-2xl bg-stone-900 text-white shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-orange-500/20 text-orange-400 flex items-center justify-center">
-                    <TrendingUp className="w-4 h-4" />
-                  </div>
-                  <span className="text-xs font-bold tracking-tight">
-                    {jenis === 'komponen' ? 'Simulasi Biaya Produksi Komponen' : 'Simulasi Live HPP & Margin Resep'}
-                  </span>
-                </div>
+            {/* Bilah Lengket di Bagian Bawah Section Resep: Tombol Tambah + Bilah Simulasi Biaya */}
+            <div className="sticky bottom-0 z-10 bg-white/95 backdrop-blur-xs -mx-5 px-5 py-2.5 border-t border-stone-200/80 shadow-md space-y-2">
+              {/* Bilah Tombol Tambah */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAddBahanRow}
+                  disabled={isSubmitting}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-bold border border-orange-200 transition active:scale-98"
+                >
+                  <Package className="w-3.5 h-3.5" />
+                  <span>+ Bahan</span>
+                </button>
 
-                {isCalculatingHpp && (
-                  <span className="text-[10px] text-stone-400 flex items-center gap-1">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    <span>Menghitung...</span>
-                  </span>
-                )}
+                <button
+                  type="button"
+                  onClick={handleAddSubProdukRow}
+                  disabled={isSubmitting}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold border border-purple-200 transition active:scale-98"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>+ Sub-Produk</span>
+                </button>
               </div>
 
-              {jenis === 'komponen' ? (
-                <div className="grid grid-cols-3 gap-2 text-center pt-2 border-t border-stone-800">
-                  <div>
-                    <div className="text-[10px] text-stone-400">Total HPP Batch</div>
-                    <div className="text-sm sm:text-base font-black text-white mt-0.5">
-                      {formatRupiah(liveKalkulasi?.hpp || 0)}
+              {/* Bilah Lengket Satu Baris: Simulasi Biaya (Ketuk Melebar Menjadi Panel Penuh) */}
+              <div className="rounded-xl bg-stone-900 text-white shadow-md overflow-hidden transition-all duration-200 border border-stone-800">
+                {/* Header Satu Baris Lengket */}
+                <button
+                  type="button"
+                  onClick={() => setIsSimulasiExpanded((prev) => !prev)}
+                  className="w-full px-3 py-2.5 flex items-center justify-between gap-2 text-left hover:bg-stone-800/80 transition"
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className="w-6 h-6 rounded-lg bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0">
+                      <TrendingUp className="w-3.5 h-3.5" />
                     </div>
-                  </div>
 
-                  <div>
-                    <div className="text-[10px] text-stone-400">Output 1 Batch</div>
-                    <div className="text-sm sm:text-base font-black text-amber-400 mt-0.5">
-                      {hasilProduksiJumlah || 1} {hasilProduksiSatuan}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-[10px] text-stone-400">Biaya per Satuan</div>
-                    <div className="text-sm sm:text-base font-black text-emerald-400 mt-0.5">
-                      {(() => {
-                        const numOut =
-                          typeof hasilProduksiJumlah === 'number'
-                            ? hasilProduksiJumlah
-                            : parseFloat(String(hasilProduksiJumlah)) || 1;
-                        const safeOut = numOut > 0 ? numOut : 1;
-                        const perSat = (liveKalkulasi?.hpp || 0) / safeOut;
-                        return formatBiayaUnit(perSat, hasilProduksiSatuan);
-                      })()}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 gap-2 text-center pt-2 border-t border-stone-800">
-                  <div>
-                    <div className="text-[10px] text-stone-400">Total HPP</div>
-                    <div className="text-sm sm:text-base font-black text-white mt-0.5">
-                      {formatRupiah(liveKalkulasi?.hpp || 0)}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-[10px] text-stone-400">Estimasi Laba</div>
-                    <div className="text-sm sm:text-base font-black text-emerald-400 mt-0.5">
-                      {formatRupiah(liveKalkulasi?.estimasiProfit || 0)}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-[10px] text-stone-400">Margin Produk</div>
-                    <div className="mt-0.5">
-                      {liveKalkulasi?.isResepKosong ? (
-                        <span className="inline-flex px-2.5 py-0.5 rounded-lg text-xs font-black border border-stone-700 bg-stone-800 text-stone-300">
-                          —
-                        </span>
+                    <div className="min-w-0 flex-1 truncate text-xs">
+                      {jenis === 'komponen' ? (
+                        <div className="flex items-baseline gap-2 flex-wrap">
+                          <span className="text-stone-400 text-[11px]">Total HPP:</span>
+                          <span className="font-black text-white font-mono">
+                            {formatRupiah(liveKalkulasi?.hpp || 0)}
+                          </span>
+                          <span className="text-stone-500 text-[10px]">·</span>
+                          <span className="text-stone-400 text-[11px]">Biaya/satuan:</span>
+                          <span className="font-bold text-emerald-400 font-mono text-[11px]">
+                            {(() => {
+                              const numOut =
+                                typeof hasilProduksiJumlah === 'number'
+                                  ? hasilProduksiJumlah
+                                  : parseFloat(String(hasilProduksiJumlah)) || 1;
+                              const safeOut = numOut > 0 ? numOut : 1;
+                              const perSat = (liveKalkulasi?.hpp || 0) / safeOut;
+                              return formatBiayaUnit(perSat, hasilProduksiSatuan);
+                            })()}
+                          </span>
+                        </div>
                       ) : (
-                        <span
-                          className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-black border ${getMarginBadgeClass(
-                            liveKalkulasi?.marginPersen || 0
-                          )}`}
-                        >
-                          {liveKalkulasi?.marginPersen ?? 0}%
-                        </span>
+                        <div className="flex items-baseline gap-2 flex-wrap">
+                          <span className="text-stone-400 text-[11px]">Total HPP:</span>
+                          <span className="font-black text-white font-mono">
+                            {formatRupiah(liveKalkulasi?.hpp || 0)}
+                          </span>
+                          <span className="text-stone-500 text-[10px]">·</span>
+                          <span className="text-stone-400 text-[11px]">Margin:</span>
+                          <span className="font-bold text-emerald-400 text-[11px]">
+                            {liveKalkulasi?.isResepKosong ? '—' : `${liveKalkulasi?.marginPersen ?? 0}%`}
+                          </span>
+                        </div>
                       )}
                     </div>
                   </div>
-                </div>
-              )}
 
-              {/* Catatan resep belum diisi */}
-              {liveKalkulasi?.isResepKosong && (
-                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-300 flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                  <div>Resep belum diisi — HPP dan margin belum dihitung.</div>
-                </div>
-              )}
-
-              {/* Warning bila ada bahan tanpa biaya */}
-              {!liveKalkulasi?.isResepKosong && liveKalkulasi?.adaBahanTanpaBiaya && (
-                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-300 flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold">Perhatian:</span> Beberapa bahan belum memiliki harga acuan (
-                    {liveKalkulasi.bahanTanpaBiayaList.join(', ')}). HPP dihitung tanpa bahan tersebut.
+                  <div className="flex items-center gap-1.5 shrink-0 text-stone-400">
+                    {isCalculatingHpp && <Loader2 className="w-3 h-3 animate-spin text-orange-400" />}
+                    <span className="text-[10px] text-stone-400 hidden sm:inline">
+                      {isSimulasiExpanded ? 'Tutup' : 'Rincian'}
+                    </span>
+                    {isSimulasiExpanded ? (
+                      <ChevronUp className="w-4 h-4 text-stone-300" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-stone-300" />
+                    )}
                   </div>
-                </div>
-              )}
+                </button>
+
+                {/* Panel Penuh Saat Diperluas */}
+                {isSimulasiExpanded && (
+                  <div className="p-3.5 border-t border-stone-800 space-y-3 animate-in fade-in duration-150">
+                    {jenis === 'komponen' ? (
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div>
+                          <div className="text-[10px] text-stone-400">Total HPP Batch</div>
+                          <div className="text-xs sm:text-sm font-black text-white mt-0.5 font-mono">
+                            {formatRupiah(liveKalkulasi?.hpp || 0)}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="text-[10px] text-stone-400">Output 1 Batch</div>
+                          <div className="text-xs sm:text-sm font-black text-amber-400 mt-0.5">
+                            {hasilProduksiJumlah || 1} {hasilProduksiSatuan}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="text-[10px] text-stone-400">Biaya per Satuan</div>
+                          <div className="text-xs sm:text-sm font-black text-emerald-400 mt-0.5 font-mono">
+                            {(() => {
+                              const numOut =
+                                typeof hasilProduksiJumlah === 'number'
+                                  ? hasilProduksiJumlah
+                                  : parseFloat(String(hasilProduksiJumlah)) || 1;
+                              const safeOut = numOut > 0 ? numOut : 1;
+                              const perSat = (liveKalkulasi?.hpp || 0) / safeOut;
+                              return formatBiayaUnit(perSat, hasilProduksiSatuan);
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div>
+                          <div className="text-[10px] text-stone-400">Total HPP</div>
+                          <div className="text-xs sm:text-sm font-black text-white mt-0.5 font-mono">
+                            {formatRupiah(liveKalkulasi?.hpp || 0)}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="text-[10px] text-stone-400">Estimasi Laba</div>
+                          <div className="text-xs sm:text-sm font-black text-emerald-400 mt-0.5 font-mono">
+                            {formatRupiah(liveKalkulasi?.estimasiProfit || 0)}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="text-[10px] text-stone-400">Margin Produk</div>
+                          <div className="mt-0.5">
+                            {liveKalkulasi?.isResepKosong ? (
+                              <span className="inline-flex px-2.5 py-0.5 rounded-lg text-xs font-black border border-stone-700 bg-stone-800 text-stone-300">
+                                —
+                              </span>
+                            ) : (
+                              <span
+                                className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-black border ${getMarginBadgeClass(
+                                  liveKalkulasi?.marginPersen || 0
+                                )}`}
+                              >
+                                {liveKalkulasi?.marginPersen ?? 0}%
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Catatan resep belum diisi */}
+                    {liveKalkulasi?.isResepKosong && (
+                      <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[10px] text-amber-300 flex items-start gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                        <div>Resep belum diisi — HPP dan margin belum dihitung.</div>
+                      </div>
+                    )}
+
+                    {/* Warning bila ada bahan tanpa biaya */}
+                    {!liveKalkulasi?.isResepKosong && liveKalkulasi?.adaBahanTanpaBiaya && (
+                      <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[10px] text-amber-300 flex items-start gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-bold">Perhatian:</span> Beberapa bahan belum memiliki harga acuan (
+                          {liveKalkulasi.bahanTanpaBiayaList.join(', ')}). HPP dihitung tanpa bahan tersebut.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1362,6 +1615,36 @@ export const ProdukFormModal: React.FC<ProdukFormModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* ItemPickerSheet untuk Memilih / Mengganti Bahan Baku & Sub-Produk */}
+      <ItemPickerSheet
+        isOpen={pickerState.isOpen}
+        onClose={() => setPickerState((prev) => ({ ...prev, isOpen: false }))}
+        title={
+          pickerState.mode === 'add'
+            ? pickerState.tab === 'bahan'
+              ? 'Tambah Bahan Baku'
+              : 'Tambah Sub-Produk'
+            : pickerState.tab === 'bahan'
+            ? 'Ganti Bahan Baku'
+            : 'Ganti Sub-Produk'
+        }
+        tabs={pickerTabs}
+        activeTab={pickerState.tab}
+        onTabChange={(tabId) =>
+          setPickerState((prev) => ({
+            ...prev,
+            tab: tabId as 'bahan' | 'sub_produk',
+          }))
+        }
+        items={pickerItems}
+        onSelect={handlePickerSelect}
+        searchPlaceholder={
+          pickerState.tab === 'bahan'
+            ? 'Cari nama bahan baku...'
+            : 'Cari nama sub-produk...'
+        }
+      />
     </div>
   );
 };

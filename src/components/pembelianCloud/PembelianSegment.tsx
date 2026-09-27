@@ -278,11 +278,11 @@ export const PembelianSegment: React.FC<PembelianSegmentProps> = ({ outletId, us
         </div>
 
         {/* Filter Bulan Segmented */}
-        <div className="flex bg-stone-200/80 p-1 rounded-xl gap-1 shrink-0 text-xs font-bold">
+        <div className="flex bg-stone-200/80 p-1 rounded-xl gap-1 shrink-0 text-xs font-bold overflow-x-auto max-w-full">
           <button
             type="button"
             onClick={() => setFilterBulan('semua')}
-            className={`px-3 py-1.5 rounded-lg transition ${
+            className={`px-3 py-1.5 rounded-lg transition whitespace-nowrap shrink-0 ${
               filterBulan === 'semua'
                 ? 'bg-white text-stone-900 shadow-xs'
                 : 'text-stone-600 hover:text-stone-900'
@@ -293,7 +293,7 @@ export const PembelianSegment: React.FC<PembelianSegmentProps> = ({ outletId, us
           <button
             type="button"
             onClick={() => setFilterBulan('bulan_ini')}
-            className={`px-3 py-1.5 rounded-lg transition ${
+            className={`px-3 py-1.5 rounded-lg transition whitespace-nowrap shrink-0 ${
               filterBulan === 'bulan_ini'
                 ? 'bg-white text-stone-900 shadow-xs'
                 : 'text-stone-600 hover:text-stone-900'
@@ -304,7 +304,7 @@ export const PembelianSegment: React.FC<PembelianSegmentProps> = ({ outletId, us
           <button
             type="button"
             onClick={() => setFilterBulan('bulan_lalu')}
-            className={`px-3 py-1.5 rounded-lg transition ${
+            className={`px-3 py-1.5 rounded-lg transition whitespace-nowrap shrink-0 ${
               filterBulan === 'bulan_lalu'
                 ? 'bg-white text-stone-900 shadow-xs'
                 : 'text-stone-600 hover:text-stone-900'
@@ -518,7 +518,7 @@ export const PembelianSegment: React.FC<PembelianSegmentProps> = ({ outletId, us
                   <button
                     type="button"
                     onClick={() => setDeletingPembelian(p)}
-                    className="p-1.5 rounded-lg text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                    className="p-1.5 rounded-lg text-stone-400 hover:text-rose-600 active:text-rose-700 hover:bg-rose-50 active:bg-rose-100 transition"
                     title="Hapus Pembelian"
                   >
                     <Trash2 className="w-3.5 h-3.5" />

@@ -14,7 +14,6 @@ import { DashboardSuperAdminPage } from './DashboardSuperAdminPage';
 import { LainnyaPage } from './LainnyaPage';
 import { OutletListPage } from './OutletListPage';
 import { UserListPage } from './UserListPage';
-import { PromoBiayaPage } from './PromoBiayaPage';
 import { OutletSelectorModal } from '../components/OutletSelectorModal';
 import { AccessDeniedToast } from '../components/AccessDeniedToast';
 import { PWAInstallBanner } from '../components/PWAInstallBanner';
@@ -50,6 +49,15 @@ export const MainLayout: React.FC = () => {
         return 'users';
       }
     }
+    if (
+      path === '/promo' ||
+      path === '/promo_biaya' ||
+      hash === '#/promo' ||
+      hash === '#/promo_biaya' ||
+      hash === '#promo'
+    ) {
+      return 'lainnya';
+    }
     return getDefaultTab(user?.role);
   });
 
@@ -59,7 +67,7 @@ export const MainLayout: React.FC = () => {
       return ['kasir', 'open_bill', 'riwayat', 'sync', 'lainnya'].includes(tab);
     }
     if (role === 'owner') {
-      return ['beranda', 'produk', 'promo_biaya', 'kasir', 'open_bill', 'riwayat', 'laporan', 'lainnya'].includes(tab);
+      return ['beranda', 'produk', 'kasir', 'open_bill', 'riwayat', 'laporan', 'lainnya'].includes(tab);
     }
     if (role === 'super_admin') {
       return ['dashboard', 'outlet', 'users', 'laporan', 'lainnya'].includes(tab);
@@ -73,6 +81,20 @@ export const MainLayout: React.FC = () => {
 
     const path = window.location.pathname;
     const hash = window.location.hash;
+
+    // Alihkan promo (sesi lama / URL lama) langsung ke tab lainnya tanpa error
+    if (
+      (activeTab as string) === 'promo' ||
+      (activeTab as string) === 'promo_biaya' ||
+      path === '/promo' ||
+      path === '/promo_biaya' ||
+      hash === '#/promo' ||
+      hash === '#/promo_biaya' ||
+      hash === '#promo'
+    ) {
+      setActiveTab('lainnya');
+      return;
+    }
 
     if (path === '/outlets' || hash === '#/outlets' || hash === '#outlets') {
       if (user.role === 'super_admin') {
@@ -235,18 +257,6 @@ export const MainLayout: React.FC = () => {
             'Pengaturan status aktif/nonaktif akun',
           ],
         };
-      case 'promo_biaya':
-        return {
-          title: 'Promo Diskon & Biaya Lain',
-          description:
-            'Konfigurasi kode voucher potongan transaksi dan biaya tambahan (delivery, service charge) per cabang.',
-          roadmap: [
-            'Kode voucher diskon persentase dan nominal',
-            'Pengaturan minimum belanja dan masa berlaku voucher',
-            'Biaya operasional tambahan dinamis (delivery, service charge)',
-            'Kalkulasi otomatis berjenjang saat kasir POS checkout',
-          ],
-        };
       case 'laporan':
         return {
           title: user.role === 'super_admin' ? 'Laporan Konsolidasi Grup' : 'Laporan Penjualan & Laba/Rugi',
@@ -279,7 +289,7 @@ export const MainLayout: React.FC = () => {
   const currentTabConfig = getTabConfig(activeTab);
 
   return (
-    <div className="min-h-screen bg-stone-100 flex flex-col justify-between">
+    <div className="h-dvh w-full flex flex-col bg-stone-100 overflow-hidden">
       {/* PWA Install Notification if available */}
       <PWAInstallBanner />
 
@@ -289,66 +299,63 @@ export const MainLayout: React.FC = () => {
         onDismiss={() => setUnauthorizedAttemptMessage(null)}
       />
 
-      {/* Global Header */}
-      <Header onOpenOutletSelector={() => setIsOutletModalOpen(true)} />
-
-      {/* Main Content Area */}
+      {/* Satu-satunya scroll container: <main> */}
       <main
-        className={`flex-1 w-full mx-auto pb-24 ${
-          activeTab === 'kasir'
-            ? 'max-w-6xl'
-            : activeTab === 'laporan' || activeTab === 'beranda' || activeTab === 'dashboard' || activeTab === 'outlet' || activeTab === 'users' || activeTab === 'promo_biaya'
-            ? 'max-w-5xl'
-            : activeTab === 'sync' || activeTab === 'open_bill' || activeTab === 'riwayat'
-            ? 'max-w-4xl'
-            : 'max-w-lg'
-        }`}
+        className="flex-1 w-full overflow-y-auto overscroll-contain scroll-pt-[60px]"
+        style={{
+          scrollPaddingTop: '60px',
+          paddingBottom: 'calc(4.75rem + env(safe-area-inset-bottom, 0px))',
+        }}
       >
-        {activeTab === 'beranda' && user.role === 'owner' ? (
-          <BerandaOwnerPage
-            onNavigateToKasir={() => setActiveTab('kasir')}
-            onNavigateToLaporan={() => setActiveTab('laporan')}
-          />
-        ) : activeTab === 'dashboard' && user.role === 'super_admin' ? (
-          <DashboardSuperAdminPage />
-        ) : activeTab === 'kasir' && (user.role === 'kasir' || user.role === 'owner') ? (
-          <PosKasirPage onNavigateToProdukTab={() => setActiveTab('produk')} />
-        ) : activeTab === 'open_bill' && (user.role === 'kasir' || user.role === 'owner') ? (
-          <OpenBillPage onNavigateToKasir={() => setActiveTab('kasir')} />
-        ) : activeTab === 'riwayat' && (user.role === 'kasir' || user.role === 'owner') ? (
-          <RiwayatTransaksiPage />
-        ) : activeTab === 'laporan' && (user.role === 'owner' || user.role === 'super_admin') ? (
-          <LaporanPage />
-        ) : activeTab === 'promo_biaya' && user.role === 'owner' ? (
-          <PromoBiayaPage />
-        ) : activeTab === 'sync' && user.role === 'kasir' ? (
-          <SyncPage />
-        ) : activeTab === 'produk' && user.role === 'owner' ? (
-          <ProdukHubPage
-            onBackToHome={() => setActiveTab(getDefaultTab(user.role))}
-            onAttemptUnauthorizedAction={handleAttemptUnauthorizedAction}
-          />
-        ) : activeTab === 'lainnya' ? (
-          <LainnyaPage />
-        ) : activeTab === 'outlet' && user.role === 'super_admin' ? (
-          <OutletListPage />
-        ) : activeTab === 'users' && user.role === 'super_admin' ? (
-          <UserListPage />
-        ) : (
-          <PlaceholderPage
-            title={currentTabConfig.title}
-            tabKey={activeTab}
-            userRole={user.role}
-            description={currentTabConfig.description}
-            roadmapDetails={currentTabConfig.roadmap}
-            onBackToHome={
-              activeTab !== getDefaultTab(user.role)
-                ? () => setActiveTab(getDefaultTab(user.role))
-                : undefined
-            }
-            onAttemptUnauthorizedAction={handleAttemptUnauthorizedAction}
-          />
-        )}
+        {/* Global Sticky Header dengan solid background */}
+        <Header onOpenOutletSelector={() => setIsOutletModalOpen(true)} />
+
+        {/* Container Konten Utama: Lebar 100% di mobile, max-w-[1200px] di layar ≥1024px */}
+        <div className="w-full lg:max-w-[1200px] mx-auto">
+          {activeTab === 'beranda' && user.role === 'owner' ? (
+            <BerandaOwnerPage
+              onNavigateToKasir={() => setActiveTab('kasir')}
+              onNavigateToLaporan={() => setActiveTab('laporan')}
+            />
+          ) : activeTab === 'dashboard' && user.role === 'super_admin' ? (
+            <DashboardSuperAdminPage />
+          ) : activeTab === 'kasir' && (user.role === 'kasir' || user.role === 'owner') ? (
+            <PosKasirPage onNavigateToProdukTab={() => setActiveTab('produk')} />
+          ) : activeTab === 'open_bill' && (user.role === 'kasir' || user.role === 'owner') ? (
+            <OpenBillPage onNavigateToKasir={() => setActiveTab('kasir')} />
+          ) : activeTab === 'riwayat' && (user.role === 'kasir' || user.role === 'owner') ? (
+            <RiwayatTransaksiPage />
+          ) : activeTab === 'laporan' && (user.role === 'owner' || user.role === 'super_admin') ? (
+            <LaporanPage />
+          ) : activeTab === 'sync' && user.role === 'kasir' ? (
+            <SyncPage />
+          ) : activeTab === 'produk' && user.role === 'owner' ? (
+            <ProdukHubPage
+              onBackToHome={() => setActiveTab(getDefaultTab(user.role))}
+              onAttemptUnauthorizedAction={handleAttemptUnauthorizedAction}
+            />
+          ) : activeTab === 'lainnya' ? (
+            <LainnyaPage />
+          ) : activeTab === 'outlet' && user.role === 'super_admin' ? (
+            <OutletListPage />
+          ) : activeTab === 'users' && user.role === 'super_admin' ? (
+            <UserListPage />
+          ) : (
+            <PlaceholderPage
+              title={currentTabConfig.title}
+              tabKey={activeTab}
+              userRole={user.role}
+              description={currentTabConfig.description}
+              roadmapDetails={currentTabConfig.roadmap}
+              onBackToHome={
+                activeTab !== getDefaultTab(user.role)
+                  ? () => setActiveTab(getDefaultTab(user.role))
+                  : undefined
+              }
+              onAttemptUnauthorizedAction={handleAttemptUnauthorizedAction}
+            />
+          )}
+        </div>
       </main>
 
       {/* Role-Based Bottom Navigation */}

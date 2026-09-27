@@ -11,6 +11,7 @@ import {
   Sparkles,
   Layers,
   ArrowRight,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { Bahan, KemasanBahan, PembelianBahan } from '../../types';
 import { bahanCloudService } from '../../services/cloud/bahanCloudService';
@@ -24,6 +25,7 @@ import {
   formatBiayaSatuan,
   getTodayDateString,
 } from '../../utils/formatters';
+import { ItemPickerSheet, ItemPickerOption } from '../common/ItemPickerSheet';
 
 interface PembelianFormModalProps {
   isOpen: boolean;
@@ -156,6 +158,26 @@ export const PembelianFormModal: React.FC<PembelianFormModalProps> = ({
       map.set(b.id, b);
     }
     return map;
+  }, [bahanList]);
+
+  // State ItemPickerSheet Bahan (Tugas 3)
+  const [pickerState, setPickerState] = useState<{
+    isOpen: boolean;
+    rowId: string | null;
+  }>({
+    isOpen: false,
+    rowId: null,
+  });
+
+  // Opsi Bahan untuk ItemPickerSheet (tab tidak perlu, duplikat tidak dilarang)
+  const pickerBahanItems: ItemPickerOption[] = useMemo(() => {
+    return bahanList.map((b) => ({
+      id: b.id,
+      label: b.nama,
+      sublabel: `Satuan: ${b.satuanDasar} · Acuan: ${formatBiayaSatuan(b.hargaPerSatuanDasar, b.satuanDasar)}`,
+      badge: b.satuanDasar,
+      badgeColor: 'orange',
+    }));
   }, [bahanList]);
 
   // Otomatis isi kemasan pertama jika belum dipilih saat bahan terpilih
@@ -566,7 +588,7 @@ export const PembelianFormModal: React.FC<PembelianFormModalProps> = ({
                   <p className="text-[11px] text-rose-600 font-semibold">{formErrors.items}</p>
                 )}
 
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {rowItems.map((row, idx) => {
                     const selectedBahan = bahanMap.get(row.bahanId);
                     const selectedKemasan = selectedBahan?.kemasanList?.find(
@@ -588,159 +610,183 @@ export const PembelianFormModal: React.FC<PembelianFormModalProps> = ({
                     const isQtyInvalid = qtyNum <= 0;
                     const isHargaInvalid = hargaNum <= 0;
 
+                    // Cek kombinasi bahan+kemasan sama di baris lain (duplikat tidak dilarang)
+                    const isDuplicateCombination = Boolean(
+                      row.bahanId &&
+                        row.kemasanId &&
+                        rowItems.some(
+                          (other) =>
+                            other.id !== row.id &&
+                            other.bahanId === row.bahanId &&
+                            other.kemasanId === row.kemasanId
+                        )
+                    );
+
                     return (
                       <div
                         key={row.id}
-                        className={`p-3.5 rounded-2xl border transition ${
+                        className={`p-3 rounded-2xl border transition ${
                           isAcuan
                             ? 'border-orange-300 bg-orange-50/20 shadow-2xs'
-                            : 'border-stone-200 bg-white'
-                        } space-y-3`}
+                            : 'border-stone-200 bg-white shadow-2xs'
+                        } space-y-2 hover:border-stone-300`}
                       >
-                        {/* Header baris: Nomor item & Tombol hapus */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-stone-100 text-stone-700 font-bold text-[10px] flex items-center justify-center">
+                        {/* Tingkat 1: Nama Bahan + Acuan + Chip Duplikat + Estimasi Biaya/Total */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0 flex-1 flex-wrap">
+                            <span className="w-5 h-5 rounded-full bg-stone-100 text-stone-700 font-bold text-[10px] flex items-center justify-center shrink-0">
                               {idx + 1}
                             </span>
-                            {isAcuan && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[10px] font-bold">
-                                <Sparkles className="w-3 h-3 text-amber-600" />
-                                <span>Kemasan Acuan Resep</span>
-                              </span>
-                            )}
-                          </div>
 
-                          {rowItems.length > 1 && (
                             <button
                               type="button"
-                              onClick={() => handleRemoveRow(row.id)}
-                              disabled={isSubmitting}
-                              className="text-stone-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 transition disabled:opacity-50"
-                              title="Hapus baris item"
+                              onClick={() => setPickerState({ isOpen: true, rowId: row.id })}
+                              className="text-left font-bold text-xs sm:text-sm text-stone-900 hover:text-orange-600 transition truncate max-w-[200px] sm:max-w-xs"
+                              title="Klik untuk memilih atau mengganti bahan"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              {selectedBahan ? (
+                                selectedBahan.nama
+                              ) : (
+                                <span className="text-orange-600 font-semibold underline decoration-dashed">
+                                  Pilih Bahan Baku...
+                                </span>
+                              )}
                             </button>
-                          )}
-                        </div>
 
-                        {/* Input Grid: Bahan, Kemasan, Qty, Total Harga */}
-                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                          {/* Pilih Bahan */}
-                          <div className="sm:col-span-4">
-                            <label className="block text-[10px] font-bold text-stone-500 mb-1">
-                              Bahan Baku *
-                            </label>
-                            <select
-                              value={row.bahanId}
-                              disabled={isSubmitting}
-                              onChange={(e) => handleBahanChange(row.id, e.target.value)}
-                              className="w-full px-2.5 py-1.5 rounded-xl border border-stone-200 text-xs font-semibold text-stone-900 focus:outline-hidden focus:ring-2 focus:ring-orange-500 bg-white disabled:bg-stone-100 disabled:text-stone-400"
-                            >
-                              <option value="">-- Pilih Bahan --</option>
-                              {bahanList.map((b) => (
-                                <option key={b.id} value={b.id}>
-                                  {b.nama} ({b.satuanDasar})
-                                </option>
-                              ))}
-                            </select>
-                            {formErrors[`item_${idx}_bahan`] && (
-                              <p className="text-[10px] text-rose-600 mt-0.5">
-                                {formErrors[`item_${idx}_bahan`]}
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Pilih Kemasan */}
-                          <div className="sm:col-span-3">
-                            <label className="block text-[10px] font-bold text-stone-500 mb-1">
-                              Kemasan Pembelian *
-                            </label>
-                            <select
-                              value={row.kemasanId}
-                              onChange={(e) => handleKemasanChange(row.id, e.target.value)}
-                              disabled={!row.bahanId || isSubmitting}
-                              className="w-full px-2.5 py-1.5 rounded-xl border border-stone-200 text-xs font-semibold text-stone-900 focus:outline-hidden focus:ring-2 focus:ring-orange-500 bg-white disabled:bg-stone-100 disabled:text-stone-400"
-                            >
-                              <option value="">-- Kemasan --</option>
-                              {(selectedBahan?.kemasanList || []).map((k) => (
-                                <option key={k.id} value={k.id}>
-                                  {k.nama} ({k.isi || k.netto} {selectedBahan?.satuanDasar})
-                                  {k.acuan ? ' (acuan)' : ''}
-                                </option>
-                              ))}
-                            </select>
-                            {formErrors[`item_${idx}_kemasan`] && (
-                              <p className="text-[10px] text-rose-600 mt-0.5">
-                                {formErrors[`item_${idx}_kemasan`]}
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Input Qty */}
-                          <div className="sm:col-span-2">
-                            <label className="block text-[10px] font-bold text-stone-500 mb-1">
-                              Qty Unit *
-                            </label>
-                            <input
-                              type="number"
-                              min="0"
-                              step="any"
-                              disabled={isSubmitting}
-                              value={row.qtyInput}
-                              onChange={(e) => handleQtyInputChange(row.id, e.target.value)}
-                              className={`w-full px-2.5 py-1.5 rounded-xl border text-xs font-semibold text-stone-900 focus:outline-hidden focus:ring-2 focus:ring-orange-500 disabled:bg-stone-100 disabled:text-stone-400 transition ${
-                                isQtyInvalid
-                                  ? 'border-rose-300 bg-rose-50/40'
-                                  : 'border-stone-300 bg-white'
-                              }`}
-                            />
-                            {formErrors[`item_${idx}_qty`] && (
-                              <p className="text-[10px] text-rose-600 mt-0.5">
-                                {formErrors[`item_${idx}_qty`]}
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Input Total Harga */}
-                          <div className="sm:col-span-3">
-                            <label className="block text-[10px] font-bold text-stone-500 mb-1">
-                              Total Harga (Rp) *
-                            </label>
-                            <input
-                              type="number"
-                              min="0"
-                              step="any"
-                              disabled={isSubmitting}
-                              value={row.hargaInput}
-                              onChange={(e) => handleHargaInputChange(row.id, e.target.value)}
-                              placeholder="0"
-                              className={`w-full px-2.5 py-1.5 rounded-xl border text-xs font-semibold text-stone-900 focus:outline-hidden focus:ring-2 focus:ring-orange-500 disabled:bg-stone-100 disabled:text-stone-400 transition ${
-                                isHargaInvalid
-                                  ? 'border-rose-300 bg-rose-50/40'
-                                  : 'border-stone-300 bg-white'
-                              }`}
-                            />
-                            {formErrors[`item_${idx}_harga`] && (
-                              <p className="text-[10px] text-rose-600 mt-0.5">
-                                {formErrors[`item_${idx}_harga`]}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Live calculation info bar */}
-                        {row.bahanId && row.kemasanId && qtyNum > 0 && hargaNum > 0 && (
-                          <div className="p-2 rounded-xl bg-stone-50 border border-stone-200/60 flex flex-wrap items-center justify-between gap-2 text-[11px]">
-                            <div className="text-stone-600">
-                              Harga per kemasan: <strong>{formatRupiah(hargaPerUnit)}</strong>
-                            </div>
-                            <div className="text-stone-800 font-semibold">
-                              Biaya hitung:{' '}
-                              <span className="text-orange-700 font-bold">
-                                {formatBiayaSatuan(hargaPerSatuan, selectedBahan?.satuanDasar)}
+                            {selectedBahan && (
+                              <span className="text-[10px] text-stone-400 font-medium shrink-0">
+                                ({selectedBahan.satuanDasar})
                               </span>
+                            )}
+
+                            {isAcuan && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[10px] font-bold shrink-0">
+                                <Sparkles className="w-3 h-3 text-amber-600" />
+                                <span>Acuan</span>
+                              </span>
+                            )}
+
+                            {/* Chip amber bila kombinasi bahan+kemasan sama sudah ada */}
+                            {isDuplicateCombination && (
+                              <span className="inline-flex items-center text-[10px] font-semibold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-md shrink-0">
+                                kombinasi sama sudah ada
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Biaya hitung / subtotal di kanan tingkat 1 */}
+                          <div className="text-right shrink-0">
+                            <div className="text-xs sm:text-sm font-black text-stone-900 font-mono">
+                              {formatRupiah(hargaNum)}
                             </div>
+                            {hargaPerSatuan > 0 && selectedBahan && (
+                              <div className="text-[10px] text-orange-700 font-bold">
+                                {formatBiayaSatuan(hargaPerSatuan, selectedBahan.satuanDasar)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Tingkat 2: Select Kemasan + Input Qty + Input Total Harga + Tombol Ganti + Tombol Hapus */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t border-stone-100">
+                          <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+                            {/* Select Kemasan Native Kecil */}
+                            <div className="min-w-[130px] flex-1 sm:flex-initial sm:w-44">
+                              <select
+                                value={row.kemasanId}
+                                onChange={(e) => handleKemasanChange(row.id, e.target.value)}
+                                disabled={!row.bahanId || isSubmitting}
+                                className="w-full px-2 py-1 rounded-lg border border-stone-200 text-xs font-semibold text-stone-900 focus:outline-none focus:ring-1 focus:ring-orange-500 bg-stone-50/70 disabled:bg-stone-100 disabled:text-stone-400"
+                              >
+                                <option value="">-- Kemasan --</option>
+                                {(selectedBahan?.kemasanList || []).map((k) => (
+                                  <option key={k.id} value={k.id}>
+                                    {k.nama} ({k.isi || k.netto} {selectedBahan?.satuanDasar})
+                                    {k.acuan ? ' (acuan)' : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Input Qty */}
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] font-bold text-stone-400 uppercase">Qty</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                disabled={isSubmitting}
+                                value={row.qtyInput}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => handleQtyInputChange(row.id, e.target.value)}
+                                placeholder="Qty"
+                                className={`w-16 sm:w-20 px-2 py-1 rounded-lg border text-xs font-bold text-stone-900 text-center focus:outline-none focus:ring-1 focus:ring-orange-500 disabled:bg-stone-100 ${
+                                  isQtyInvalid ? 'border-rose-300 bg-rose-50/50' : 'border-stone-200 bg-stone-50/70'
+                                }`}
+                              />
+                            </div>
+
+                            {/* Input Total Harga */}
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] font-bold text-stone-400 uppercase">Rp</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                disabled={isSubmitting}
+                                value={row.hargaInput}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => handleHargaInputChange(row.id, e.target.value)}
+                                placeholder="Total"
+                                className={`w-24 sm:w-28 px-2 py-1 rounded-lg border text-xs font-bold text-stone-900 text-right focus:outline-none focus:ring-1 focus:ring-orange-500 disabled:bg-stone-100 ${
+                                  isHargaInvalid ? 'border-rose-300 bg-rose-50/50' : 'border-stone-200 bg-stone-50/70'
+                                }`}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Action Buttons: Ganti & Hapus */}
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPickerState({ isOpen: true, rowId: row.id });
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold text-stone-600 hover:text-stone-900 bg-stone-100 hover:bg-stone-200 active:scale-95 transition"
+                              title="Ganti bahan baku"
+                            >
+                              <ArrowLeftRight className="w-3.5 h-3.5 text-stone-500" />
+                              <span>Ganti</span>
+                            </button>
+
+                            {rowItems.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveRow(row.id);
+                                }}
+                                disabled={isSubmitting}
+                                className="text-stone-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 transition active:scale-95 disabled:opacity-50"
+                                title="Hapus baris item"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Pesan Error Validasi Row jika ada */}
+                        {(formErrors[`item_${idx}_bahan`] ||
+                          formErrors[`item_${idx}_kemasan`] ||
+                          formErrors[`item_${idx}_qty`] ||
+                          formErrors[`item_${idx}_harga`]) && (
+                          <div className="text-[10px] text-rose-600 font-semibold space-y-0.5 pt-1">
+                            {formErrors[`item_${idx}_bahan`] && <p>• {formErrors[`item_${idx}_bahan`]}</p>}
+                            {formErrors[`item_${idx}_kemasan`] && <p>• {formErrors[`item_${idx}_kemasan`]}</p>}
+                            {formErrors[`item_${idx}_qty`] && <p>• {formErrors[`item_${idx}_qty`]}</p>}
+                            {formErrors[`item_${idx}_harga`] && <p>• {formErrors[`item_${idx}_harga`]}</p>}
                           </div>
                         )}
                       </div>
@@ -748,15 +794,18 @@ export const PembelianFormModal: React.FC<PembelianFormModalProps> = ({
                   })}
                 </div>
 
-                {/* Tombol Tambah Baris */}
-                <button
-                  type="button"
-                  onClick={handleAddRow}
-                  className="w-full py-2.5 rounded-xl border-2 border-dashed border-stone-200 hover:border-orange-400 hover:bg-orange-50/40 text-stone-600 hover:text-orange-600 font-bold text-xs flex items-center justify-center gap-1.5 transition"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Tambah Item Bahan Lainnya</span>
-                </button>
+                {/* Bilah Lengket Tombol Tambah Item */}
+                <div className="sticky bottom-0 z-10 bg-white/95 backdrop-blur-xs py-2 px-1 border-t border-stone-200/80 shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={handleAddRow}
+                    disabled={isSubmitting}
+                    className="w-full py-2.5 rounded-xl border border-dashed border-orange-300 hover:border-orange-500 bg-orange-50/50 hover:bg-orange-100/60 text-orange-700 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-98 shadow-2xs"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Tambah Item Bahan Lainnya</span>
+                  </button>
+                </div>
               </div>
 
               {/* Catatan Tambahan */}
@@ -905,6 +954,20 @@ export const PembelianFormModal: React.FC<PembelianFormModalProps> = ({
           </div>
         </div>
       )}
+
+      {/* ItemPickerSheet untuk Memilih / Mengganti Bahan Baku (Tugas 3) */}
+      <ItemPickerSheet
+        isOpen={pickerState.isOpen}
+        onClose={() => setPickerState((prev) => ({ ...prev, isOpen: false }))}
+        title="Pilih Bahan Baku"
+        items={pickerBahanItems}
+        onSelect={(selectedBahanId) => {
+          if (pickerState.rowId) {
+            handleBahanChange(pickerState.rowId, selectedBahanId);
+          }
+        }}
+        searchPlaceholder="Cari nama bahan baku..."
+      />
     </div>
   );
 };

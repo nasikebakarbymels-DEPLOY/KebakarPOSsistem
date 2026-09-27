@@ -42,9 +42,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenOutletSelector }) => {
   const canSwitchOutlet = user?.role === 'owner' && (user.outletIds?.length || 0) > 1;
 
   return (
-    <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200 shadow-xs">
+    <header className="sticky top-0 z-30 bg-white border-b border-stone-200 shadow-xs">
       {/* Main Header Bar */}
-      <div className="px-4 py-2.5 flex items-center justify-between gap-2 max-w-5xl mx-auto">
+      <div className="px-4 py-2.5 flex items-center justify-between gap-2 w-full lg:max-w-[1200px] mx-auto">
         {/* Left: Outlet / App Brand */}
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-orange-600 flex items-center justify-center text-white shadow-xs shrink-0">
@@ -95,14 +95,18 @@ export const Header: React.FC<HeaderProps> = ({ onOpenOutletSelector }) => {
 
         {/* Right: Status Indicators & Profile Dropdown */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Connection Status Badge */}
+          {/* Connection Status Badge with detailed tooltip */}
           <div
             className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border ${
               isOnline
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                 : 'bg-rose-50 text-rose-700 border-rose-200'
             }`}
-            title={isOnline ? 'Perangkat terhubung ke internet' : 'Perangkat sedang offline'}
+            title={
+              isOnline
+                ? 'Status: Online (Terhubung ke cloud Firestore)'
+                : 'Status: Offline (Bekerja secara lokal di IndexedDB)'
+            }
           >
             {isOnline ? (
               <>
@@ -117,7 +121,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenOutletSelector }) => {
             )}
           </div>
 
-          {/* Pending Sync Badge */}
+          {/* Pending Sync Badge with detailed tooltip */}
           <button
             type="button"
             onClick={async () => {
@@ -134,12 +138,12 @@ export const Header: React.FC<HeaderProps> = ({ onOpenOutletSelector }) => {
             }`}
             title={
               pendingSyncCount > 0
-                ? `${pendingSyncCount} transaksi menunggu sinkronisasi (Klik untuk sync)`
-                : 'Tidak ada antrean sinkronisasi'
+                ? `${pendingSyncCount} transaksi menunggu sinkronisasi ke cloud (Klik untuk sync sekarang)`
+                : `Sinkronisasi: Semua data tersinkron (${isOnline ? 'Online' : 'Offline'}, 0 transaksi pending)`
             }
           >
             <RefreshCw
-              className={`w-3 h-3 ${pendingSyncCount > 0 ? 'text-amber-700' : 'text-stone-500'}`}
+              className={`w-3 h-3 ${pendingSyncCount > 0 ? 'text-amber-700 animate-spin-slow' : 'text-stone-500'}`}
             />
             <span className="text-[10px] font-bold">{pendingSyncCount}</span>
           </button>

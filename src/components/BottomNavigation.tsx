@@ -11,7 +11,6 @@ import {
   Store,
   Home,
   Users,
-  TicketPercent,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { usePendingSyncCount } from '../hooks/usePendingSyncCount';
@@ -40,7 +39,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, o
         return [
           { id: 'beranda', label: 'Beranda', icon: Home },
           { id: 'produk', label: 'Produk', icon: UtensilsCrossed },
-          { id: 'promo_biaya', label: 'Promo', icon: TicketPercent },
           { id: 'kasir', label: 'Kasir', icon: Receipt },
           { id: 'laporan', label: 'Laporan', icon: BarChart3 },
           { id: 'lainnya', label: 'Lainnya', icon: MoreHorizontal },
@@ -69,8 +67,11 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, o
   const navItems = getNavItems(user.role);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-stone-200 shadow-lg">
-      <div className="max-w-xl mx-auto px-1.5 flex items-center justify-around">
+    <nav
+      className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-stone-200 shadow-lg"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+    >
+      <div className="w-full max-w-xl mx-auto px-1.5 flex items-center justify-around">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
