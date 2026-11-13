@@ -5,7 +5,7 @@ export const formatRupiah = (val?: number): string => {
   return `Rp${Math.round(val).toLocaleString('id-ID')}`;
 };
 
-// Formatter biaya per satuan dasar, mendukung 3 desimal untuk gram/ml agar presisi konsisten dengan HPP batch
+// Formatter biaya per satuan dasar: desimal konsisten (max 3 desimal, trim trailing zero), tanpa spasi sebelum / (contoh: Rp24/gram)
 export const formatBiayaSatuan = (
   biaya?: number,
   satuan?: SatuanDasar | string,
@@ -16,21 +16,35 @@ export const formatBiayaSatuan = (
   }
   
   const isInteger = Number.isInteger(biaya);
-  const maxDecimals =
-    forceDecimals !== undefined
-      ? forceDecimals
-      : satuan === 'gram' || satuan === 'ml'
-      ? 3
-      : 2;
+  const maxDecimals = forceDecimals !== undefined ? forceDecimals : 3;
 
   const formattedVal = isInteger
     ? Math.round(biaya).toLocaleString('id-ID')
     : biaya.toLocaleString('id-ID', {
-        minimumFractionDigits: 1,
         maximumFractionDigits: maxDecimals,
       });
 
-  return `Rp${formattedVal} /${satuan || ''}`;
+  const unitStr = satuan ? `/${satuan}` : '';
+  return `Rp${formattedVal}${unitStr}`;
+};
+
+// Format quantity kemasan dengan konversi otomatis ke satuan besar (19 L, 5 kg) atau separator ribu id-ID (19.000 ml)
+export const formatQuantityKemasan = (isi?: number, satuanDasar?: string): string => {
+  if (isi === undefined || isi === null || isNaN(isi)) return '';
+  const sat = (satuanDasar || '').toLowerCase().trim();
+  if (sat === 'gram') {
+    if (isi >= 1000 && isi % 1000 === 0) {
+      return `${isi / 1000} kg`;
+    }
+    return `${isi.toLocaleString('id-ID')} gram`;
+  }
+  if (sat === 'ml') {
+    if (isi >= 1000 && isi % 1000 === 0) {
+      return `${isi / 1000} L`;
+    }
+    return `${isi.toLocaleString('id-ID')} ml`;
+  }
+  return `${isi.toLocaleString('id-ID')} ${satuanDasar || ''}`.trim();
 };
 
 // Helper internal untuk mengekstrak string tanggal ISO dari berbagai tipe
@@ -83,19 +97,26 @@ export const formatTanggalIndo = (dateInput?: FirestoreTimestamp | Date | null):
   }
 };
 
-// Format tanggal & jam ke gaya Indonesia: 22 Sep 2026, 14:30
+// Format tanggal & jam ke gaya Indonesia: 27 Sep 2026, 16.42
 export const formatDateTimeIndo = (dateInput?: FirestoreTimestamp | Date | null): string => {
   const isoStr = toDateString(dateInput);
   if (!isoStr) return '';
   try {
     const d = new Date(isoStr);
-    return d.toLocaleDateString('id-ID', {
+    if (isNaN(d.getTime())) return isoStr;
+    const formatted = new Intl.DateTimeFormat('id-ID', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-    });
+      hour12: false,
+    }).format(d);
+    // Standarisasi pemisah jam menjadi titik dan pisahkan tanggal dengan koma (misal: "27 Sep 2026, 16.42")
+    return formatted
+      .replace(/(\d{4})\s*,\s*(\d{2})[:\.](\d{2})/, '$1, $2.$3')
+      .replace(/(\d{4})\s+(\d{2})[:\.](\d{2})/, '$1, $2.$3')
+      .replace(':', '.');
   } catch {
     return isoStr;
   }

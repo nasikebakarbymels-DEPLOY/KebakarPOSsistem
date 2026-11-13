@@ -157,14 +157,21 @@ export const PembelianSegment: React.FC<PembelianSegmentProps> = ({ outletId, us
   ) => {
     setIsFormOpen(false);
 
-    if (editingPembelian) {
-      showToast('Catatan pembelian berhasil diperbarui.');
-    } else if (gagalUpdate && gagalUpdate.length > 0) {
+    if (gagalUpdate && gagalUpdate.length > 0) {
       const daftarNama = gagalUpdate.map((g) => g.bahanNama).join(', ');
       showToast(
         `Pembelian tersimpan, tetapi harga acuan berikut gagal diperbarui: ${daftarNama}. Harga lama masih dipakai pada HPP.`,
         'error'
       );
+    } else if (editingPembelian) {
+      if (hargaAcuanDiubah && hargaAcuanDiubah.length > 0) {
+        const listStr = hargaAcuanDiubah.map((h) => h.bahanNama).join(', ');
+        showToast(
+          `Catatan pembelian diperbarui & harga acuan bahan (${listStr}) ikut diperbarui!`
+        );
+      } else {
+        showToast('Catatan pembelian berhasil diperbarui.');
+      }
     } else {
       if (hargaAcuanDiubah && hargaAcuanDiubah.length > 0) {
         const listStr = hargaAcuanDiubah.map((h) => h.bahanNama).join(', ');
@@ -539,6 +546,7 @@ export const PembelianSegment: React.FC<PembelianSegmentProps> = ({ outletId, us
           outletId={outletId}
           userId={userId}
           editingPembelian={editingPembelian}
+          existingPembelianList={pembelianList}
         />
       )}
 

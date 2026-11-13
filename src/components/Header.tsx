@@ -1,16 +1,73 @@
 import React, { useState } from 'react';
-import { Store, Wifi, WifiOff, RefreshCw, LogOut, ChevronDown, ShieldCheck, UserCircle, Building2 } from 'lucide-react';
+import {
+  Store,
+  Wifi,
+  WifiOff,
+  RefreshCw,
+  LogOut,
+  ChevronDown,
+  ShieldCheck,
+  UserCircle,
+  Building2,
+  Home,
+  UtensilsCrossed,
+  Receipt,
+  BarChart3,
+  MoreHorizontal,
+  Layers,
+  History,
+  LayoutDashboard,
+  Users,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { usePendingSyncCount } from '../hooks/usePendingSyncCount';
+import { ActiveTab, UserRole } from '../types';
 
 interface HeaderProps {
   onOpenOutletSelector?: () => void;
+  activeTab?: ActiveTab;
+  onTabChange?: (tab: ActiveTab) => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenOutletSelector }) => {
+export const Header: React.FC<HeaderProps> = ({
+  onOpenOutletSelector,
+  activeTab,
+  onTabChange,
+}) => {
   const { user, currentOutlet, isOnline, logout } = useAuth();
   const pendingSyncCount = usePendingSyncCount(currentOutlet?.id);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  const getNavItems = (role: UserRole) => {
+    switch (role) {
+      case 'owner':
+        return [
+          { id: 'beranda' as ActiveTab, label: 'Beranda', icon: Home },
+          { id: 'produk' as ActiveTab, label: 'Produk', icon: UtensilsCrossed },
+          { id: 'kasir' as ActiveTab, label: 'Kasir', icon: Receipt },
+          { id: 'laporan' as ActiveTab, label: 'Laporan', icon: BarChart3 },
+          { id: 'lainnya' as ActiveTab, label: 'Lainnya', icon: MoreHorizontal },
+        ];
+      case 'kasir':
+        return [
+          { id: 'kasir' as ActiveTab, label: 'Kasir', icon: Receipt },
+          { id: 'open_bill' as ActiveTab, label: 'Open Bill', icon: Layers },
+          { id: 'riwayat' as ActiveTab, label: 'Riwayat', icon: History },
+          { id: 'sync' as ActiveTab, label: 'Sync', icon: RefreshCw },
+          { id: 'lainnya' as ActiveTab, label: 'Lainnya', icon: MoreHorizontal },
+        ];
+      case 'super_admin':
+        return [
+          { id: 'dashboard' as ActiveTab, label: 'Dashboard', icon: LayoutDashboard },
+          { id: 'outlet' as ActiveTab, label: 'Outlet', icon: Store },
+          { id: 'users' as ActiveTab, label: 'User', icon: Users },
+          { id: 'laporan' as ActiveTab, label: 'Laporan', icon: BarChart3 },
+          { id: 'lainnya' as ActiveTab, label: 'Lainnya', icon: MoreHorizontal },
+        ];
+      default:
+        return [];
+    }
+  };
 
   const getRoleBadge = (role?: string) => {
     switch (role) {
@@ -92,6 +149,36 @@ export const Header: React.FC<HeaderProps> = ({ onOpenOutletSelector }) => {
             )}
           </div>
         </div>
+
+        {/* Center: Desktop Top Navigation (≥1024px) */}
+        {user && activeTab && onTabChange && (
+          <nav className="hidden lg:flex items-center gap-1 bg-stone-100 p-1 rounded-xl border border-stone-200/80">
+            {getNavItems(user.role).map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onTabChange(item.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 relative ${
+                    isActive
+                      ? 'bg-white text-orange-600 shadow-2xs'
+                      : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/60'
+                  }`}
+                >
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+                  <span>{item.label}</span>
+                  {item.id === 'sync' && pendingSyncCount > 0 && (
+                    <span className="bg-amber-500 text-white text-[9px] font-black rounded-full px-1 min-w-[14px] h-[14px] flex items-center justify-center">
+                      {pendingSyncCount > 99 ? '99+' : pendingSyncCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+        )}
 
         {/* Right: Status Indicators & Profile Dropdown */}
         <div className="flex items-center gap-2 shrink-0">

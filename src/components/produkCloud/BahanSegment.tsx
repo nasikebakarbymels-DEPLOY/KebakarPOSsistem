@@ -11,11 +11,18 @@ import {
   Sparkles,
   Loader2,
   History,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { Bahan } from '../../types';
 import { bahanCloudService } from '../../services/cloud/bahanCloudService';
 import { BahanFormModal } from './BahanFormModal';
-import { formatBiayaSatuan, formatRupiah, formatTanggalSlash } from '../../utils/formatters';
+import {
+  formatBiayaSatuan,
+  formatRupiah,
+  formatDateTimeIndo,
+  formatQuantityKemasan,
+} from '../../utils/formatters';
 
 interface BahanSegmentProps {
   outletId: string;
@@ -38,6 +45,21 @@ export const BahanSegment: React.FC<BahanSegmentProps> = ({ outletId, userId }) 
   // Toast State & Timer Ref
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const toastTimerRef = useRef<NodeJS.Timeout | number | null>(null);
+
+  // State Riwayat Harga Collapsible (Default: Collapsed)
+  const [expandedRiwayatBahanIds, setExpandedRiwayatBahanIds] = useState<Set<string>>(new Set());
+
+  const toggleRiwayat = (bahanId: string) => {
+    setExpandedRiwayatBahanIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(bahanId)) {
+        next.delete(bahanId);
+      } else {
+        next.add(bahanId);
+      }
+      return next;
+    });
+  };
 
   const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     if (toastTimerRef.current) {
@@ -312,16 +334,18 @@ export const BahanSegment: React.FC<BahanSegmentProps> = ({ outletId, userId }) 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
           {filteredBahan.map((bahan) => {
             const acuanKemasan = (bahan.kemasanList || []).find((k) => k.acuan) || bahan.kemasanList?.[0];
+            const isRiwayatExpanded = expandedRiwayatBahanIds.has(bahan.id);
+            const riwayatList = bahan.riwayatHarga || [];
 
             return (
               <div
                 key={bahan.id}
                 className="bg-white rounded-2xl p-4 border border-stone-200 shadow-2xs hover:shadow-xs transition flex flex-col justify-between space-y-3"
               >
-                {/* Header Card: Nama, Satuan Dasar & Actions */}
+                {/* Header Card: Nama (text-base), Satuan Dasar & Actions */}
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <h3 className="text-sm font-bold text-stone-900 leading-snug">{bahan.nama}</h3>
+                    <h3 className="text-base font-bold text-stone-900 leading-snug">{bahan.nama}</h3>
                     <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-stone-100 text-stone-700 capitalize">
                         Satuan Dasar: {bahan.satuanDasar}
@@ -359,8 +383,8 @@ export const BahanSegment: React.FC<BahanSegmentProps> = ({ outletId, userId }) 
                   </div>
                 </div>
 
-                {/* Box Biaya Acuan Satuan Dasar */}
-                <div className="p-2.5 rounded-xl bg-orange-50/60 border border-orange-200/70 flex items-center justify-between">
+                {/* Box Biaya Acuan Satuan Dasar (p-3) */}
+                <div className="p-3 rounded-xl bg-orange-50/60 border border-orange-200/70 flex items-center justify-between">
                   <div>
                     <span className="text-[10px] font-bold text-orange-950 block">
                       Harga Acuan Resep
@@ -369,7 +393,7 @@ export const BahanSegment: React.FC<BahanSegmentProps> = ({ outletId, userId }) 
                       {acuanKemasan ? `Dari ${acuanKemasan.nama}` : 'Belum diset'}
                     </span>
                   </div>
-                  <div className="text-xs sm:text-sm font-black text-orange-700">
+                  <div className="text-xs sm:text-sm font-black text-orange-700 font-mono">
                     {formatBiayaSatuan(bahan.hargaPerSatuanDasar, bahan.satuanDasar)}
                   </div>
                 </div>
@@ -391,7 +415,9 @@ export const BahanSegment: React.FC<BahanSegmentProps> = ({ outletId, userId }) 
                       >
                         {k.acuan && <Sparkles className="w-3 h-3 text-amber-600 shrink-0" />}
                         <span>{k.nama}</span>
-                        <span className="text-stone-400">({k.isi ?? k.netto} {bahan.satuanDasar})</span>
+                        <span className="text-stone-400">
+                          ({formatQuantityKemasan(k.isi ?? k.netto, bahan.satuanDasar)})
+                        </span>
                         {typeof k.hargaPerKemasan === 'number' && k.hargaPerKemasan > 0 && (
                           <span className="text-stone-900 font-bold ml-0.5">
                             {formatRupiah(k.hargaPerKemasan)}
@@ -402,28 +428,43 @@ export const BahanSegment: React.FC<BahanSegmentProps> = ({ outletId, userId }) 
                   </div>
                 </div>
 
-                {/* Riwayat Harga */}
-                <div className="pt-1.5 border-t border-stone-100">
-                  <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                    <History className="w-3 h-3 text-stone-400" />
-                    <span>Riwayat harga:</span>
-                  </div>
-                  {bahan.riwayatHarga && bahan.riwayatHarga.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {bahan.riwayatHarga.slice(0, 3).map((r, rIdx) => (
-                        <span
+                {/* Riwayat Harga (Collapsible default dengan toggle Riwayat harga (n)) */}
+                <div className="pt-2 border-t border-stone-100">
+                  <button
+                    type="button"
+                    onClick={() => toggleRiwayat(bahan.id)}
+                    disabled={riwayatList.length === 0}
+                    className="w-full flex items-center justify-between text-[11px] font-bold text-stone-600 hover:text-stone-900 transition py-0.5 disabled:opacity-60 disabled:cursor-default"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <History className="w-3.5 h-3.5 text-stone-400" />
+                      <span>Riwayat harga ({riwayatList.length})</span>
+                    </div>
+                    {riwayatList.length > 0 && (
+                      isRiwayatExpanded ? (
+                        <ChevronUp className="w-3.5 h-3.5 text-stone-400" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
+                      )
+                    )}
+                  </button>
+
+                  {isRiwayatExpanded && riwayatList.length > 0 && (
+                    <div className="mt-2 space-y-1.5 animate-in fade-in duration-150">
+                      {riwayatList.map((r, rIdx) => (
+                        <div
                           key={rIdx}
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] bg-stone-100 text-stone-700 font-medium"
+                          className="flex items-center justify-between text-[11px] bg-stone-50 px-2.5 py-1.5 rounded-lg border border-stone-100"
                         >
-                          <span className="text-stone-400">{formatTanggalSlash(r.tanggal)}:</span>
-                          <span className="font-bold text-stone-800">
+                          <span className="text-stone-500 font-medium">
+                            {formatDateTimeIndo(r.tanggal)}
+                          </span>
+                          <span className="font-bold text-stone-900 font-mono">
                             {formatBiayaSatuan(r.hargaPerSatuanDasar, bahan.satuanDasar)}
                           </span>
-                        </span>
+                        </div>
                       ))}
                     </div>
-                  ) : (
-                    <span className="text-[10px] text-stone-400 italic">belum ada riwayat</span>
                   )}
                 </div>
 

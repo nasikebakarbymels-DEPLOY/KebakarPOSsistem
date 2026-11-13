@@ -8,12 +8,31 @@ const LEGACY_STORAGE_DEVICE_KEY = 'pos_printer_device'; // Backward compatibilit
 
 const STORAGE_SERVICE_UUID_KEY = 'pos_printer_service_uuid';
 const STORAGE_CHAR_UUID_KEY = 'pos_printer_char_uuid';
+const STORAGE_SETUP_CONFIG_KEY = 'pos_printer_setup_config';
 
 // Default UUIDs
 export const DEFAULT_SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb';
 export const DEFAULT_CHAR_UUID = '00002af1-0000-1000-8000-00805f9b34fb';
 
 export const BLE_PRINTER_STATUS_EVENT = 'pos_fnb_ble_printer_status_changed';
+
+export type PaperWidth = '58mm' | '80mm';
+
+export interface PrinterSetupConfig {
+  paperWidth: PaperWidth;
+  autoPrintStruk: boolean;
+  autoCut: boolean;
+  copies: 1 | 2;
+  footerText: string;
+}
+
+export const DEFAULT_PRINTER_SETUP_CONFIG: PrinterSetupConfig = {
+  paperWidth: '58mm',
+  autoPrintStruk: false,
+  autoCut: true,
+  copies: 1,
+  footerText: 'Terima kasih atas kunjungan Anda',
+};
 
 // Interface Web Bluetooth API typing
 interface BluetoothRemoteGATTCharacteristicWithWrite {
@@ -131,6 +150,51 @@ class PrinterBleService {
     } else {
       localStorage.removeItem(STORAGE_CHAR_UUID_KEY);
     }
+  }
+
+  public resetUuidDefaults(): void {
+    localStorage.removeItem(STORAGE_SERVICE_UUID_KEY);
+    localStorage.removeItem(STORAGE_CHAR_UUID_KEY);
+    this.emitStatus();
+  }
+
+  public getSetupConfig(): PrinterSetupConfig {
+    try {
+      const raw = localStorage.getItem(STORAGE_SETUP_CONFIG_KEY);
+      if (!raw) return { ...DEFAULT_PRINTER_SETUP_CONFIG };
+      const parsed = JSON.parse(raw) as Partial<PrinterSetupConfig>;
+      return {
+        paperWidth: parsed.paperWidth === '80mm' ? '80mm' : '58mm',
+        autoPrintStruk: Boolean(parsed.autoPrintStruk),
+        autoCut: parsed.autoCut !== undefined ? Boolean(parsed.autoCut) : true,
+        copies: parsed.copies === 2 ? 2 : 1,
+        footerText:
+          typeof parsed.footerText === 'string'
+            ? parsed.footerText
+            : DEFAULT_PRINTER_SETUP_CONFIG.footerText,
+      };
+    } catch {
+      return { ...DEFAULT_PRINTER_SETUP_CONFIG };
+    }
+  }
+
+  public setSetupConfig(partial: Partial<PrinterSetupConfig>): PrinterSetupConfig {
+    const current = this.getSetupConfig();
+    const updated: PrinterSetupConfig = {
+      ...current,
+      ...partial,
+      paperWidth: (partial.paperWidth ?? current.paperWidth) === '80mm' ? '80mm' : '58mm',
+      copies: (partial.copies ?? current.copies) === 2 ? 2 : 1,
+    };
+    localStorage.setItem(STORAGE_SETUP_CONFIG_KEY, JSON.stringify(updated));
+    this.emitStatus();
+    return updated;
+  }
+
+  public resetSetupConfig(): PrinterSetupConfig {
+    localStorage.removeItem(STORAGE_SETUP_CONFIG_KEY);
+    this.emitStatus();
+    return { ...DEFAULT_PRINTER_SETUP_CONFIG };
   }
 
   // --- Saved Printers ---
@@ -639,6 +703,9 @@ class PrinterBleService {
   private triggerBrowserFallbackPrint(title: string, bodyText: string): void {
     if (typeof window === 'undefined') return;
 
+    const setup = this.getSetupConfig();
+    const paperCssWidth = setup.paperWidth === '80mm' ? '80mm' : '58mm';
+
     const printFrame = document.createElement('iframe');
     printFrame.style.position = 'fixed';
     printFrame.style.right = '0';
@@ -661,7 +728,7 @@ class PrinterBleService {
         <head>
           <title>${title}</title>
           <style>
-            body { font-family: monospace; font-size: 13px; padding: 12px; margin: 0; max-width: 58mm; white-space: pre-wrap; }
+            body { font-family: monospace; font-size: 13px; padding: 12px; margin: 0; max-width: ${paperCssWidth}; white-space: pre-wrap; }
             h2 { font-size: 15px; margin: 0 0 6px 0; text-align: center; }
             hr { border: none; border-top: 1px dashed #000; margin: 6px 0; }
           </style>
@@ -680,6 +747,17 @@ class PrinterBleService {
     }, 250);
   }
 
+  private getPaperColumns(): number {
+    return this.getSetupConfig().paperWidth === '80mm' ? 48 : 32;
+  }
+
+  private formatCols(left: string, right: string, width: number): string {
+    const maxLeft = Math.max(1, width - right.length - 1);
+    const truncatedLeft = left.length > maxLeft ? left.substring(0, maxLeft) : left;
+    const spaces = Math.max(1, width - truncatedLeft.length - right.length);
+    return truncatedLeft + ' '.repeat(spaces) + right;
+  }
+
   // ================= TIKET DAPUR & KOREKSI =================
 
   /**
@@ -689,6 +767,11 @@ class PrinterBleService {
    * bila tidak ada keduanya fallback window.print.
    */
   public async printKitchenTicket(payload: KitchenTicketPayload): Promise<void> {
+    const setup = this.getSetupConfig();
+    const width = this.getPaperColumns();
+    const dashLine = '-'.repeat(width);
+    const eqLine = '='.repeat(width);
+
     const builder = new EscPosBuilder();
     builder.init();
     builder.alignCenter();
@@ -701,7 +784,7 @@ class PrinterBleService {
     builder.setBold(false);
     builder.textLine(`No Order : ${payload.nomorOrder}`);
     builder.textLine(`Waktu    : ${formatDateTimeIndo(payload.waktu)}`);
-    builder.textLine('--------------------------------');
+    builder.textLine(dashLine);
 
     builder.alignLeft();
     for (const item of payload.items) {
@@ -714,13 +797,15 @@ class PrinterBleService {
     }
 
     if (payload.catatan?.trim()) {
-      builder.textLine('--------------------------------');
+      builder.textLine(dashLine);
       builder.textLine(`Catatan Order: ${payload.catatan.trim()}`);
     }
 
-    builder.textLine('================================');
+    builder.textLine(eqLine);
     builder.feed(3);
-    builder.cut();
+    if (setup.autoCut) {
+      builder.cut();
+    }
 
     const bytes = builder.build();
 
@@ -766,6 +851,11 @@ class PrinterBleService {
    * Header "KOREKSI PESANAN" + alasan wajib.
    */
   public async printCorrectionTicket(payload: CorrectionTicketPayload): Promise<void> {
+    const setup = this.getSetupConfig();
+    const width = this.getPaperColumns();
+    const dashLine = '-'.repeat(width);
+    const eqLine = '='.repeat(width);
+
     const builder = new EscPosBuilder();
     builder.init();
     builder.alignCenter();
@@ -776,14 +866,14 @@ class PrinterBleService {
     builder.textLine(`Tipe : ${payload.tipe.toUpperCase()}`);
     builder.textLine(`No Order : ${payload.nomorOrder}`);
     builder.textLine(`Waktu    : ${formatDateTimeIndo(payload.waktu)}`);
-    builder.textLine('--------------------------------');
+    builder.textLine(dashLine);
 
     builder.alignLeft();
     builder.setBold(true);
     builder.textLine('ALASAN KOREKSI:');
     builder.textLine(payload.alasan);
     builder.setBold(false);
-    builder.textLine('--------------------------------');
+    builder.textLine(dashLine);
 
     builder.textLine('DAFTAR ITEM TERBARU:');
     for (const item of payload.items) {
@@ -796,13 +886,15 @@ class PrinterBleService {
     }
 
     if (payload.catatan?.trim()) {
-      builder.textLine('--------------------------------');
+      builder.textLine(dashLine);
       builder.textLine(`Catatan Order: ${payload.catatan.trim()}`);
     }
 
-    builder.textLine('================================');
+    builder.textLine(eqLine);
     builder.feed(3);
-    builder.cut();
+    if (setup.autoCut) {
+      builder.cut();
+    }
 
     const bytes = builder.build();
 
@@ -853,6 +945,10 @@ class PrinterBleService {
       throw new Error('Printer Struk belum terhubung. Silakan hubungkan terlebih dahulu.');
     }
 
+    const setup = this.getSetupConfig();
+    const width = this.getPaperColumns();
+    const dashLine = '-'.repeat(width);
+
     const builder = new EscPosBuilder();
     builder.init();
     builder.alignCenter();
@@ -860,16 +956,19 @@ class PrinterBleService {
     builder.textLine(outletNama);
     builder.setBold(false);
     builder.textLine('UJI KONEKSI PRINTER STRUK');
-    builder.textLine('--------------------------------');
+    builder.textLine(dashLine);
     builder.alignLeft();
     builder.textLine('Status    : TERHUBUNG OK');
     builder.textLine(`Perangkat : ${this.getConnectedStrukName()}`);
+    builder.textLine(`Kertas    : ${setup.paperWidth} (${width} kolom)`);
     builder.textLine(`Waktu     : ${formatDateTimeIndo(new Date().toISOString())}`);
-    builder.textLine('--------------------------------');
+    builder.textLine(dashLine);
     builder.alignCenter();
     builder.textLine('Printer struk siap digunakan!');
     builder.feed(3);
-    builder.cut();
+    if (setup.autoCut) {
+      builder.cut();
+    }
 
     await this.printStrukEscPos(builder.build());
   }
@@ -879,6 +978,11 @@ class PrinterBleService {
       throw new Error('Printer Dapur belum terhubung. Silakan hubungkan terlebih dahulu.');
     }
 
+    const setup = this.getSetupConfig();
+    const width = this.getPaperColumns();
+    const dashLine = '-'.repeat(width);
+    const eqLine = '='.repeat(width);
+
     const builder = new EscPosBuilder();
     builder.init();
     builder.alignCenter();
@@ -886,13 +990,14 @@ class PrinterBleService {
     builder.textLine('=== CONTOH TIKET DAPUR ===');
     builder.setBold(false);
     builder.textLine(outletNama);
-    builder.textLine('--------------------------------');
+    builder.textLine(dashLine);
     builder.alignLeft();
     builder.textLine('Tipe      : DINE-IN');
     builder.textLine('Label     : Meja 12 (Contoh)');
     builder.textLine(`Perangkat : ${this.getConnectedDapurName()}`);
+    builder.textLine(`Kertas    : ${setup.paperWidth} (${width} kolom)`);
     builder.textLine(`Waktu     : ${formatDateTimeIndo(new Date().toISOString())}`);
-    builder.textLine('--------------------------------');
+    builder.textLine(dashLine);
     builder.setBold(true);
     builder.textLine('2x Nasi Goreng Spesial');
     builder.setBold(false);
@@ -901,11 +1006,13 @@ class PrinterBleService {
     builder.textLine('1x Es Teh Manis Jumbo');
     builder.setBold(false);
     builder.textLine('   * Kurang manis, es banyak');
-    builder.textLine('================================');
+    builder.textLine(eqLine);
     builder.alignCenter();
     builder.textLine('Printer dapur siap digunakan!');
     builder.feed(3);
-    builder.cut();
+    if (setup.autoCut) {
+      builder.cut();
+    }
 
     await this.printDapurEscPos(builder.build());
   }
@@ -921,6 +1028,11 @@ class PrinterBleService {
       throw new Error('Printer Bluetooth belum terhubung.');
     }
 
+    const setup = this.getSetupConfig();
+    const width = this.getPaperColumns();
+    const dashLine = '-'.repeat(width);
+    const eqLine = '='.repeat(width);
+
     const builder = new EscPosBuilder();
     builder.init();
 
@@ -935,7 +1047,7 @@ class PrinterBleService {
     if (outlet?.telepon) {
       builder.textLine(`Telp: ${outlet.telepon}`);
     }
-    builder.textLine('================================');
+    builder.textLine(eqLine);
 
     // Info Transaksi
     builder.alignLeft();
@@ -945,26 +1057,17 @@ class PrinterBleService {
     if (transaksi.pelangganNama) {
       builder.textLine(`Plg : ${transaksi.pelangganNama}`);
     }
-    builder.textLine('--------------------------------');
+    builder.textLine(dashLine);
 
-    // Items (Lebar 32 karakter standar 58mm)
+    // Items (58mm = 32 kolom, 80mm = 48 kolom)
     for (const item of transaksi.items) {
       builder.textLine(item.nama);
       const detailStr = `  ${item.qty} x ${formatRupiah(item.hargaJual)}`;
       const subtotalStr = formatRupiah(item.subtotal);
-      const spacesNeeded = Math.max(1, 32 - detailStr.length - subtotalStr.length);
-      builder.textLine(detailStr + ' '.repeat(spacesNeeded) + subtotalStr);
+      builder.textLine(this.formatCols(detailStr, subtotalStr, width));
     }
 
-    builder.textLine('--------------------------------');
-
-    // Helper format baris rata kiri-kanan lebar 32 karakter
-    const formatLine32 = (label: string, value: string): string => {
-      const maxLabelLen = Math.max(1, 32 - value.length - 1);
-      const truncatedLabel = label.length > maxLabelLen ? label.substring(0, maxLabelLen) : label;
-      const spaces = Math.max(1, 32 - truncatedLabel.length - value.length);
-      return truncatedLabel + ' '.repeat(spaces) + value;
-    };
+    builder.textLine(dashLine);
 
     // Subtotal kotor sebelum diskon
     const subtotalHitung = transaksi.items.reduce((acc, it) => {
@@ -973,25 +1076,29 @@ class PrinterBleService {
     }, 0);
     const subtotalFinal = transaksi.subtotalKotor || subtotalHitung;
     if (subtotalFinal > 0) {
-      builder.textLine(formatLine32('Subtotal', formatRupiah(subtotalFinal)));
+      builder.textLine(this.formatCols('Subtotal', formatRupiah(subtotalFinal), width));
     }
 
     // Diskon Promo jika ada
     if (transaksi.diskonProdukTotal && transaksi.diskonProdukTotal > 0) {
-      builder.textLine(formatLine32('Diskon Promo', `-${formatRupiah(transaksi.diskonProdukTotal)}`));
+      builder.textLine(
+        this.formatCols('Diskon Promo', `-${formatRupiah(transaksi.diskonProdukTotal)}`, width)
+      );
     }
 
     // Voucher jika ada
     if (transaksi.voucherNilai && transaksi.voucherNilai > 0) {
       const voucherLabel = transaksi.voucherKode ? `Voucher (${transaksi.voucherKode})` : 'Voucher';
-      builder.textLine(formatLine32(voucherLabel, `-${formatRupiah(transaksi.voucherNilai)}`));
+      builder.textLine(
+        this.formatCols(voucherLabel, `-${formatRupiah(transaksi.voucherNilai)}`, width)
+      );
     }
 
     // Rincian Biaya Lain jika ada
     if (transaksi.biayaLainList && transaksi.biayaLainList.length > 0) {
       for (const biaya of transaksi.biayaLainList) {
         const namaBiaya = `${biaya.nama}${biaya.isManual ? '*' : ''}`;
-        builder.textLine(formatLine32(namaBiaya, formatRupiah(biaya.subtotal)));
+        builder.textLine(this.formatCols(namaBiaya, formatRupiah(biaya.subtotal), width));
       }
     }
 
@@ -1001,37 +1108,46 @@ class PrinterBleService {
       builder.textLine('  PIN Owner');
     }
 
-    builder.textLine('--------------------------------');
+    builder.textLine(dashLine);
 
     // Total & Pembayaran
-    const totalLabel = 'TOTAL';
-    const totalVal = formatRupiah(transaksi.total);
-    const totalSpaces = Math.max(1, 32 - totalLabel.length - totalVal.length);
     builder.setBold(true);
-    builder.textLine(totalLabel + ' '.repeat(totalSpaces) + totalVal);
+    builder.textLine(this.formatCols('TOTAL', formatRupiah(transaksi.total), width));
     builder.setBold(false);
 
     const metodeLabel = `Bayar (${transaksi.metodeBayar.toUpperCase()})`;
     builder.textLine(metodeLabel);
 
     if (transaksi.metodeBayar === 'tunai' && transaksi.uangDiterima !== undefined) {
-      const uangDiterimaStr = formatRupiah(transaksi.uangDiterima);
-      const tunaiSpaces = Math.max(1, 32 - '  Diterima'.length - uangDiterimaStr.length);
-      builder.textLine('  Diterima' + ' '.repeat(tunaiSpaces) + uangDiterimaStr);
-
-      const kembalianStr = formatRupiah(transaksi.kembalian || 0);
-      const kembalianSpaces = Math.max(1, 32 - '  Kembalian'.length - kembalianStr.length);
-      builder.textLine('  Kembalian' + ' '.repeat(kembalianSpaces) + kembalianStr);
+      builder.textLine(this.formatCols('  Diterima', formatRupiah(transaksi.uangDiterima), width));
+      builder.textLine(
+        this.formatCols('  Kembalian', formatRupiah(transaksi.kembalian || 0), width)
+      );
     }
 
-    builder.textLine('================================');
+    builder.textLine(eqLine);
     builder.alignCenter();
-    builder.textLine('Terima kasih atas kunjungan Anda');
-    builder.textLine('Barang yang dibeli tidak dapat ditukar');
+    const footerLines = (setup.footerText.trim() || DEFAULT_PRINTER_SETUP_CONFIG.footerText).split(
+      '\n'
+    );
+    for (const line of footerLines) {
+      if (line.trim()) {
+        builder.textLine(line.trim());
+      }
+    }
     builder.feed(3);
-    builder.cut();
+    if (setup.autoCut) {
+      builder.cut();
+    }
 
-    await this.printStrukEscPos(builder.build());
+    const bytes = builder.build();
+    const copies = setup.copies === 2 ? 2 : 1;
+    for (let c = 0; c < copies; c++) {
+      await this.printStrukEscPos(bytes);
+      if (c < copies - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+    }
   }
 }
 

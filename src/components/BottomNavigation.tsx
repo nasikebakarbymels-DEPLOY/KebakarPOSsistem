@@ -68,7 +68,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, o
 
   return (
     <nav
-      className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-stone-200 shadow-lg"
+      className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-stone-200 shadow-lg"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
       <div className="w-full max-w-xl mx-auto px-1.5 flex items-center justify-around">

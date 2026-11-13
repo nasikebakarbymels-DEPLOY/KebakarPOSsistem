@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Printer,
   CheckCircle2,
   X,
-  FileText,
   ArrowRight,
   Bluetooth,
 } from 'lucide-react';
@@ -32,11 +31,47 @@ export const StrukModal: React.FC<StrukModalProps> = ({
     type: 'success' | 'info' | 'error';
     text: string;
   } | null>(null);
+  const lastAutoPrintedIdRef = useRef<string | null>(null);
 
-  if (!isOpen || !transaksi) return null;
-
+  const setupConfig = printerBleService.getSetupConfig();
   const isBleConnected = printerBleService.isConnected();
   const printerName = printerBleService.getConnectedDeviceName();
+
+  useEffect(() => {
+    if (!isOpen || !transaksi) {
+      return;
+    }
+
+    if (
+      setupConfig.autoPrintStruk &&
+      printerBleService.isStrukConnected() &&
+      lastAutoPrintedIdRef.current !== transaksi.id
+    ) {
+      lastAutoPrintedIdRef.current = transaksi.id;
+      setIsPrinting(true);
+      printService
+        .printStruk(transaksi, currentOutlet)
+        .then((mode) => {
+          if (mode === 'ble') {
+            setFeedback({
+              type: 'success',
+              text: `Struk otomatis dikirim ke printer "${printerBleService.getConnectedStrukName() || 'Bluetooth'}".`,
+            });
+          }
+        })
+        .catch((err: unknown) => {
+          setFeedback({
+            type: 'error',
+            text: err instanceof Error ? err.message : 'Gagal mencetak struk otomatis.',
+          });
+        })
+        .finally(() => {
+          setIsPrinting(false);
+        });
+    }
+  }, [isOpen, transaksi, currentOutlet, setupConfig.autoPrintStruk]);
+
+  if (!isOpen || !transaksi) return null;
 
   const handlePrint = async () => {
     setFeedback(null);
@@ -87,7 +122,7 @@ export const StrukModal: React.FC<StrukModalProps> = ({
           </button>
         </div>
 
-        {/* Content Body: Tampilan Struk 58mm */}
+        {/* Content Body: Tampilan Struk */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-4 bg-stone-100/50 flex-1">
           {/* Status Bluetooth Chip */}
           <div className="flex items-center justify-between text-xs px-3 py-2 rounded-xl bg-white border border-stone-200 shadow-2xs">
@@ -127,10 +162,12 @@ export const StrukModal: React.FC<StrukModalProps> = ({
             </div>
           )}
 
-          {/* Lembar Kertas Struk Termal (Layout 58mm) */}
+          {/* Lembar Kertas Struk Termal */}
           <div
             id="printable-receipt"
-            className="bg-white p-5 rounded-xl border border-stone-200 shadow-xs font-mono text-xs text-stone-800 mx-auto max-w-[340px]"
+            className={`bg-white p-5 rounded-xl border border-stone-200 shadow-xs font-mono text-xs text-stone-800 mx-auto ${
+              setupConfig.paperWidth === '80mm' ? 'max-w-[420px]' : 'max-w-[340px]'
+            }`}
             style={{ minHeight: '380px' }}
           >
             {/* Header Outlet */}
@@ -284,8 +321,11 @@ export const StrukModal: React.FC<StrukModalProps> = ({
 
             {/* Footer Ucapan */}
             <div className="text-center text-[10px] text-stone-500 space-y-0.5">
-              <p>Terima kasih atas kunjungan Anda!</p>
-              <p>Barang yang sudah dibeli tidak dapat ditukar.</p>
+              {(setupConfig.footerText.trim() || 'Terima kasih atas kunjungan Anda!')
+                .split('\n')
+                .map((line, i) =>
+                  line.trim() ? <p key={i}>{line.trim()}</p> : null
+                )}
             </div>
           </div>
         </div>

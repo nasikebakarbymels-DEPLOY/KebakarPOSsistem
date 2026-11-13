@@ -58,6 +58,10 @@ export interface GagalUpdateHargaItem {
   alasan: string;
 }
 
+export interface UpdatePembelianOptions {
+  syncHargaAcuan?: boolean;
+}
+
 export const pembelianCloudService = {
   /**
    * Mengambil semua pembelian bahan aktif (isDeleted === false) pada suatu outlet,
@@ -397,18 +401,25 @@ export const pembelianCloudService = {
 
   /**
    * Memperbarui dokumen pembelian bahan.
-   * ATURAN: Hanya memperbarui dokumen pembelian (tanggal, supplier, items, totalPembelian, version +1).
-   * DILARANG menyentuh harga acuan maupun riwayatHarga bahan (edit pembelian lama tidak memundurkan harga).
+   * Bila syncHargaAcuan = true (atau bila pembelian ini merupakan sumber riwayatHarga terbaru pada bahan),
+   * item berkemasan acuan yang harganya berubah juga akan memperbarui harga acuan & riwayat bahan.
    */
   async updatePembelian(
     outletId: string,
     id: string,
     input: UpdatePembelianInput,
-    uid: string
-  ): Promise<void> {
+    uid: string,
+    options?: UpdatePembelianOptions
+  ): Promise<{
+    hargaAcuanDiubah: PerubahanHargaAcuanItem[];
+    gagalUpdate: GagalUpdateHargaItem[];
+  }> {
     if (!outletId || !id) throw new Error('Parameter outletId dan id wajib diisi.');
 
     const path = `outlets/${outletId}/pembelianBahan/${id}`;
+    const now = new Date().toISOString();
+    let updatedItems: ItemPembelian[] = [];
+
     try {
       const docRef = getOutletDocRef<Omit<PembelianBahan, 'id'>>(
         outletId,
@@ -421,7 +432,6 @@ export const pembelianCloudService = {
       }
       const existing = snap.data();
 
-      const now = new Date().toISOString();
       const nextVersion =
         (typeof existing.version === 'number' ? existing.version : 1) + 1;
 
@@ -449,7 +459,7 @@ export const pembelianCloudService = {
           throw new Error('Minimal harus ada 1 item pembelian.');
         }
 
-        const items: ItemPembelian[] = input.items.map((it) => {
+        updatedItems = input.items.map((it) => {
           const qty = Number(it.qty) || 1;
           const hargaTotal = Number(it.hargaTotal) || 0;
           const isi = Number(it.isiPerKemasanSnapshot) || 1;
@@ -469,16 +479,139 @@ export const pembelianCloudService = {
           };
         });
 
-        const totalPembelian = items.reduce((sum, item) => sum + item.hargaTotal, 0);
-        updatePayload.items = items;
+        const totalPembelian = updatedItems.reduce((sum, item) => sum + item.hargaTotal, 0);
+        updatePayload.items = updatedItems;
         updatePayload.totalPembelian = totalPembelian;
         updatePayload.totalHarga = totalPembelian;
+      } else {
+        updatedItems = Array.isArray(existing.items) ? existing.items : [];
       }
 
       await updateDoc(docRef, sanitizePayload(updatePayload));
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
     }
+
+    const hargaAcuanDiubah: PerubahanHargaAcuanItem[] = [];
+    const gagalUpdate: GagalUpdateHargaItem[] = [];
+
+    if (options?.syncHargaAcuan === false || updatedItems.length === 0) {
+      return { hargaAcuanDiubah, gagalUpdate };
+    }
+
+    for (const item of updatedItems) {
+      if (!item.isAcuanKemasan) continue;
+
+      try {
+        const bahanDocRef = getOutletDocRef<Omit<Bahan, 'id'>>(
+          outletId,
+          'bahan',
+          item.bahanId
+        );
+        const bahanSnap = await getDoc(bahanDocRef);
+        if (!bahanSnap.exists()) continue;
+
+        const bahanData = bahanSnap.data();
+        if (bahanData.isDeleted) continue;
+
+        const currentRiwayat: RiwayatHargaBahan[] = Array.isArray(bahanData.riwayatHarga)
+          ? [...bahanData.riwayatHarga]
+          : [];
+
+        const shouldUpdate =
+          options?.syncHargaAcuan === true ||
+          currentRiwayat[0]?.pembelianId === id;
+
+        if (!shouldUpdate) continue;
+
+        const hargaLama =
+          typeof bahanData.hargaPerSatuanDasar === 'number'
+            ? bahanData.hargaPerSatuanDasar
+            : 0;
+
+        const isi = item.isiPerKemasanSnapshot > 0 ? item.isiPerKemasanSnapshot : 1;
+        const hargaBaru = Number((item.hargaPerUnit / isi).toFixed(4));
+
+        const rawKemasan = Array.isArray(bahanData.kemasanList)
+          ? [...bahanData.kemasanList]
+          : [];
+        const targetKemasan = rawKemasan.find((k) => k.id === item.kemasanId);
+        const existingKemasanHarga =
+          typeof targetKemasan?.hargaPerKemasan === 'number'
+            ? targetKemasan.hargaPerKemasan
+            : undefined;
+
+        const isPriceChanged =
+          hargaBaru !== hargaLama || existingKemasanHarga !== item.hargaPerUnit;
+
+        if (!isPriceChanged) continue;
+
+        let perubahanPersen = 0;
+        if (hargaLama > 0) {
+          perubahanPersen = Number(
+            (((hargaBaru - hargaLama) / hargaLama) * 100).toFixed(1)
+          );
+        } else if (hargaBaru > 0) {
+          perubahanPersen = 100;
+        }
+
+        const updatedKemasanList: KemasanBahan[] = rawKemasan.map((k) => {
+          if (k.id === item.kemasanId) {
+            return {
+              ...k,
+              hargaPerKemasan: item.hargaPerUnit,
+              acuan: true,
+            };
+          }
+          return k;
+        });
+
+        // Ganti entri riwayat dari pembelianId ini jika sudah ada agar tidak meninggalkan angka salah
+        const filteredRiwayat = currentRiwayat.filter((r) => r.pembelianId !== id);
+        filteredRiwayat.unshift({
+          tanggal: now,
+          hargaPerSatuanDasar: hargaBaru,
+          pembelianId: id,
+        });
+        const truncatedRiwayat = filteredRiwayat.slice(0, 50);
+
+        const nextVersion =
+          (typeof bahanData.version === 'number' ? bahanData.version : 1) + 1;
+
+        await updateDoc(
+          bahanDocRef,
+          sanitizePayload({
+            hargaPerSatuanDasar: hargaBaru,
+            biayaTerbaru: hargaBaru,
+            kemasanList: updatedKemasanList,
+            riwayatHarga: truncatedRiwayat,
+            version: nextVersion,
+            updatedBy: uid,
+            updatedAt: now,
+          })
+        );
+
+        hargaAcuanDiubah.push({
+          bahanNama: item.namaBahanSnapshot,
+          lama: hargaLama,
+          baru: hargaBaru,
+          perubahanPersen,
+        });
+      } catch (error) {
+        console.error(
+          `[pembelianCloudService] Gagal menyinkronkan harga acuan bahan ${item.bahanId} saat edit:`,
+          error
+        );
+        const alasan =
+          error instanceof Error ? error.message : 'Gagal memperbarui harga di Firestore.';
+        gagalUpdate.push({
+          bahanNama: item.namaBahanSnapshot,
+          alasan,
+        });
+      }
+    }
+
+    return { hargaAcuanDiubah, gagalUpdate };
   },
 
   /**

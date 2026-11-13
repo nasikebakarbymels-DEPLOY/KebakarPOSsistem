@@ -38,6 +38,7 @@ interface PembelianFormModalProps {
   outletId: string;
   userId: string;
   editingPembelian?: PembelianBahan | null;
+  existingPembelianList?: PembelianBahan[];
 }
 
 interface FormRowItem {
@@ -65,6 +66,7 @@ export const PembelianFormModal: React.FC<PembelianFormModalProps> = ({
   outletId,
   userId,
   editingPembelian,
+  existingPembelianList,
 }) => {
   const isEditMode = Boolean(editingPembelian);
 
@@ -83,7 +85,11 @@ export const PembelianFormModal: React.FC<PembelianFormModalProps> = ({
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // Dialog Konfirmasi Perubahan Harga Acuan (Create Mode Only)
+  // Opsi sinkronisasi harga acuan bahan saat Edit Mode
+  const [syncHargaAcuanOnEdit, setSyncHargaAcuanOnEdit] = useState<boolean>(true);
+  const [hasManualSyncToggle, setHasManualSyncToggle] = useState<boolean>(false);
+
+  // Dialog Konfirmasi Perubahan Harga Acuan
   const [showConfirmHargaModal, setShowConfirmHargaModal] = useState<boolean>(false);
   const [daftarCalonPerubahan, setDaftarCalonPerubahan] = useState<CalonPerubahanHarga[]>([]);
 
@@ -119,8 +125,11 @@ export const PembelianFormModal: React.FC<PembelianFormModalProps> = ({
       setShowConfirmHargaModal(false);
       setDaftarCalonPerubahan([]);
       setFormErrors({});
+      setHasManualSyncToggle(false);
       return;
     }
+
+    setHasManualSyncToggle(false);
 
     if (editingPembelian) {
       setTanggal(editingPembelian.tanggal || getTodayDateString());
@@ -159,6 +168,54 @@ export const PembelianFormModal: React.FC<PembelianFormModalProps> = ({
     }
     return map;
   }, [bahanList]);
+
+  // Cek apakah pembelian yang sedang diedit sudah tertimpa oleh pembelian bahan yang lebih baru
+  const hasNewerPurchaseForAcuan = useMemo(() => {
+    if (!editingPembelian || !existingPembelianList || existingPembelianList.length === 0) {
+      return false;
+    }
+
+    const acuanBahanIds = new Set(
+      rowItems
+        .filter((row) => {
+          const b = bahanMap.get(row.bahanId);
+          const k = b?.kemasanList?.find((itemK) => itemK.id === row.kemasanId);
+          const hasAnyAcuan = b?.kemasanList?.some((x) => x.acuan === true);
+          return Boolean(k?.acuan || (!hasAnyAcuan && k && b?.kemasanList?.[0]?.id === k.id));
+        })
+        .map((r) => r.bahanId)
+    );
+
+    if (acuanBahanIds.size === 0) return false;
+
+    const newerCandidates = existingPembelianList.filter((p) => {
+      if (p.id === editingPembelian.id) return false;
+      const dateCmp = String(p.tanggal).localeCompare(String(editingPembelian.tanggal));
+      if (dateCmp > 0) return true;
+      if (dateCmp < 0) return false;
+      return String(p.createdAt).localeCompare(String(editingPembelian.createdAt)) > 0;
+    });
+
+    for (const bahanId of acuanBahanIds) {
+      const b = bahanMap.get(bahanId);
+      if (b?.riwayatHarga?.[0]?.pembelianId === editingPembelian.id) {
+        return false;
+      }
+      const hasNewerForThisBahan = newerCandidates.some((p) =>
+        (p.items || []).some((it) => it.bahanId === bahanId)
+      );
+      if (!hasNewerForThisBahan) {
+        return false;
+      }
+    }
+
+    return true;
+  }, [editingPembelian, existingPembelianList, rowItems, bahanMap]);
+
+  useEffect(() => {
+    if (!isOpen || !isEditMode || loadingBahan || hasManualSyncToggle) return;
+    setSyncHargaAcuanOnEdit(!hasNewerPurchaseForAcuan);
+  }, [isOpen, isEditMode, loadingBahan, hasManualSyncToggle, hasNewerPurchaseForAcuan]);
 
   // State ItemPickerSheet Bahan (Tugas 3)
   const [pickerState, setPickerState] = useState<{
@@ -341,6 +398,9 @@ export const PembelianFormModal: React.FC<PembelianFormModalProps> = ({
       const qtyNum = parseFloat(row.qtyInput) || 0;
       const hargaNum = parseFloat(row.hargaInput) || 0;
 
+      const hasAnyAcuan = b?.kemasanList?.some((itemK) => itemK.acuan === true);
+      const isAcuan = Boolean(k?.acuan || (!hasAnyAcuan && k && b?.kemasanList?.[0]?.id === k.id));
+
       return {
         bahanId: row.bahanId,
         kemasanId: row.kemasanId,
@@ -349,7 +409,7 @@ export const PembelianFormModal: React.FC<PembelianFormModalProps> = ({
         isiPerKemasanSnapshot: isi,
         qty: qtyNum,
         hargaTotal: hargaNum,
-        isAcuanKemasan: Boolean(k?.acuan),
+        isAcuanKemasan: isAcuan,
       };
     });
   };
@@ -359,18 +419,10 @@ export const PembelianFormModal: React.FC<PembelianFormModalProps> = ({
     e.preventDefault();
     if (!validateForm()) return;
 
-    if (isEditMode) {
-      // Mode edit: langsung simpan tanpa dialog konfirmasi perubahan harga acuan
-      executeSave();
-      return;
-    }
-
-    // Mode create: periksa apakah ada item berkemasan acuan
     const itemsPayload = prepareItemsPayload();
     const acuanItems = itemsPayload.filter((it) => it.isAcuanKemasan);
 
-    if (acuanItems.length === 0) {
-      // Tidak ada kemasan acuan yang tersentuh, langsung simpan
+    if (acuanItems.length === 0 || (isEditMode && !syncHargaAcuanOnEdit)) {
       executeSave();
       return;
     }
@@ -386,6 +438,15 @@ export const PembelianFormModal: React.FC<PembelianFormModalProps> = ({
       const hargaPerUnit = item.qty > 0 ? item.hargaTotal / item.qty : 0;
       const isi = item.isiPerKemasanSnapshot > 0 ? item.isiPerKemasanSnapshot : 1;
       const hargaBaru = Number((hargaPerUnit / isi).toFixed(4));
+
+      const targetKem = b.kemasanList?.find((k) => k.id === item.kemasanId);
+      const existingKemHarga =
+        typeof targetKem?.hargaPerKemasan === 'number' ? targetKem.hargaPerKemasan : undefined;
+      const roundedUnit = Number(hargaPerUnit.toFixed(2));
+
+      if (isEditMode && hargaBaru === hargaLama && existingKemHarga === roundedUnit) {
+        continue;
+      }
 
       let perubahanPersen = 0;
       if (hargaLama > 0) {
@@ -407,6 +468,11 @@ export const PembelianFormModal: React.FC<PembelianFormModalProps> = ({
       });
     }
 
+    if (calonList.length === 0) {
+      executeSave();
+      return;
+    }
+
     setDaftarCalonPerubahan(calonList);
     setShowConfirmHargaModal(true);
   };
@@ -418,7 +484,7 @@ export const PembelianFormModal: React.FC<PembelianFormModalProps> = ({
       const itemsPayload = prepareItemsPayload();
 
       if (isEditMode && editingPembelian) {
-        await pembelianCloudService.updatePembelian(
+        const result = await pembelianCloudService.updatePembelian(
           outletId,
           editingPembelian.id,
           {
@@ -427,10 +493,12 @@ export const PembelianFormModal: React.FC<PembelianFormModalProps> = ({
             catatan: catatan.trim() || undefined,
             items: itemsPayload,
           },
-          userId
+          userId,
+          { syncHargaAcuan: syncHargaAcuanOnEdit }
         );
 
-        onSuccess(editingPembelian.id, []);
+        setShowConfirmHargaModal(false);
+        onSuccess(editingPembelian.id, result.hargaAcuanDiubah, result.gagalUpdate);
       } else {
         const result = await pembelianCloudService.createPembelian(
           outletId,
@@ -489,15 +557,30 @@ export const PembelianFormModal: React.FC<PembelianFormModalProps> = ({
 
         {/* Content Body Form */}
         <form onSubmit={handleSubmitClick} noValidate className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-          {/* Banner Peringatan Mode Edit */}
+          {/* Opsi Sinkronisasi Harga Bahan (Mode Edit) */}
           {isEditMode && (
-            <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2.5 text-xs text-amber-900 shadow-2xs">
-              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <label className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2.5 text-xs text-amber-950 shadow-2xs cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={syncHargaAcuanOnEdit}
+                onChange={(e) => {
+                  setHasManualSyncToggle(true);
+                  setSyncHargaAcuanOnEdit(e.target.checked);
+                }}
+                disabled={isSubmitting}
+                className="mt-0.5 w-4 h-4 rounded border-amber-400 text-orange-600 focus:ring-orange-500 shrink-0"
+              />
               <div className="leading-relaxed">
-                <strong>Kebijakan Audit:</strong> Mengubah pembelian lama tidak memundurkan harga
-                acuan bahan baku agar resep produk terdahulu tetap konsisten.
+                <span className="font-bold block">
+                  Perbarui harga acuan di Daftar Bahan &amp; resep HPP
+                </span>
+                <span className="text-[11px] text-amber-800 block mt-0.5">
+                  {hasNewerPurchaseForAcuan
+                    ? 'Sudah ada pembelian yang lebih baru untuk bahan terkait. Biarkan tidak dicentang agar harga terbaru tidak tertimpa, atau centang jika ingin memaksa pembaruan.'
+                    : 'Pembelian ini merupakan transaksi terbaru. Harga kemasan acuan & harga satuan dasar di Daftar Bahan akan otomatis diperbarui sesuai revisi nota ini.'}
+                </span>
               </div>
-            </div>
+            </label>
           )}
 
           {/* Error Submit Banner */}
@@ -947,7 +1030,7 @@ export const PembelianFormModal: React.FC<PembelianFormModalProps> = ({
                     <span>Menyimpan...</span>
                   </>
                 ) : (
-                  <span>Ya, Simpan Pembelian</span>
+                  <span>{isEditMode ? 'Ya, Simpan & Perbarui Harga' : 'Ya, Simpan Pembelian'}</span>
                 )}
               </button>
             </div>

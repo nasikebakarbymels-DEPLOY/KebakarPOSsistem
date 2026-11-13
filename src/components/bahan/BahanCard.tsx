@@ -1,7 +1,7 @@
 import React from 'react';
 import { Package, Edit2, Trash2, Plus, Sparkles, Scale, AlertCircle } from 'lucide-react';
 import { Bahan } from '../../types';
-import { formatBiayaSatuan } from '../../utils/formatters';
+import { formatBiayaSatuan, formatQuantityKemasan } from '../../utils/formatters';
 
 interface BahanCardProps {
   bahan: Bahan;
@@ -106,7 +106,9 @@ export const BahanCard: React.FC<BahanCardProps> = ({
                   className="inline-flex items-center gap-1 text-[11px] bg-stone-100/90 text-stone-700 px-2.5 py-1 rounded-lg border border-stone-200/50 font-medium"
                 >
                   <span className="font-semibold">{k.nama}</span>
-                  <span className="text-stone-400">({k.netto} {bahan.satuanDasar})</span>
+                  <span className="text-stone-400">
+                    ({formatQuantityKemasan(k.netto, bahan.satuanDasar)})
+                  </span>
                 </span>
               ))}
               {kemasanCount > 3 && (

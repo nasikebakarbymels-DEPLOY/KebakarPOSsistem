@@ -301,14 +301,17 @@ export const MainLayout: React.FC = () => {
 
       {/* Satu-satunya scroll container: <main> */}
       <main
-        className="flex-1 w-full overflow-y-auto overscroll-contain scroll-pt-[60px]"
+        className="flex-1 w-full overflow-y-auto overscroll-contain scroll-pt-[60px] pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))] lg:pb-8"
         style={{
           scrollPaddingTop: '60px',
-          paddingBottom: 'calc(4.75rem + env(safe-area-inset-bottom, 0px))',
         }}
       >
-        {/* Global Sticky Header dengan solid background */}
-        <Header onOpenOutletSelector={() => setIsOutletModalOpen(true)} />
+        {/* Global Sticky Header dengan solid background & Desktop Top Nav */}
+        <Header
+          onOpenOutletSelector={() => setIsOutletModalOpen(true)}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+        />
 
         {/* Container Konten Utama: Lebar 100% di mobile, max-w-[1200px] di layar ≥1024px */}
         <div className="w-full lg:max-w-[1200px] mx-auto">

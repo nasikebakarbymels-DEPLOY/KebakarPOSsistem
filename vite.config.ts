@@ -15,14 +15,15 @@ export default defineConfig(() => {
         workbox: {
           navigateFallback: '/index.html',
           globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         },
         manifest: {
           id: '/',
           name: 'POS F&B Multi-Outlet',
           short_name: 'POS F&B',
           description: 'Aplikasi POS F&B multi-outlet berbasis PWA dengan role-based access dan navigasi mobile-first.',
-          theme_color: '#f97316',
-          background_color: '#fafaf9',
+          theme_color: '#ffffff',
+          background_color: '#ffffff',
           display: 'standalone',
           start_url: '/',
           scope: '/',

@@ -118,16 +118,6 @@ export const ProdukHubPage: React.FC<ProdukHubPageProps> = () => {
 
       {/* Main Content Area */}
       <div className="p-4 sm:p-6 w-full space-y-4">
-        {/* Banner Status Cloud Aktif */}
-        <div className="p-3 rounded-xl bg-orange-50/70 border border-orange-200/70 flex items-center justify-between gap-3 text-xs text-orange-900">
-          <div className="flex items-center gap-2">
-            <Store className="w-4 h-4 text-orange-600 shrink-0" />
-            <span>
-              Outlet Aktif: <strong>{currentOutlet.nama}</strong> · Data tersinkronisasi di Firestore Cloud
-            </span>
-          </div>
-        </div>
-
         {/* Tab 1: Menu & Resep Cloud */}
         {activeTab === 'menu' && (
           <MenuSegment outletId={currentOutlet.id} userId={user.id} />
