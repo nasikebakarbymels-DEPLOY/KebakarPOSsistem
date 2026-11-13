@@ -67,13 +67,13 @@ export const ProdukHubPage: React.FC<ProdukHubPageProps> = () => {
   return (
     <div className="w-full">
       {/* Sticky Tab Navigator - diletakkan di bawah sticky header (top-[57px]) dengan solid background */}
-      <div className="px-4 pt-3 pb-2.5 bg-stone-100 sticky top-[57px] z-20 border-b border-stone-200/60 shadow-2xs">
+      <div className="px-3 sm:px-4 pt-2.5 pb-2 bg-stone-100 sticky top-[57px] z-20 border-b border-stone-200/60 shadow-2xs">
         <div className="flex bg-stone-200/80 p-1 rounded-2xl gap-1 max-w-2xl mx-auto">
           {/* Tab 1: Menu & Resep (Cloud) */}
           <button
             type="button"
             onClick={() => setActiveTab('menu')}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
               activeTab === 'menu'
                 ? 'bg-white text-orange-600 shadow-sm'
                 : 'text-stone-600 hover:text-stone-900'
@@ -88,7 +88,7 @@ export const ProdukHubPage: React.FC<ProdukHubPageProps> = () => {
           <button
             type="button"
             onClick={() => setActiveTab('bahan')}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
               activeTab === 'bahan'
                 ? 'bg-white text-orange-600 shadow-sm'
                 : 'text-stone-600 hover:text-stone-900'
@@ -103,7 +103,7 @@ export const ProdukHubPage: React.FC<ProdukHubPageProps> = () => {
           <button
             type="button"
             onClick={() => setActiveTab('pembelian')}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
               activeTab === 'pembelian'
                 ? 'bg-white text-orange-600 shadow-sm'
                 : 'text-stone-600 hover:text-stone-900'
@@ -117,7 +117,7 @@ export const ProdukHubPage: React.FC<ProdukHubPageProps> = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="p-4 sm:p-6 w-full space-y-4">
+      <div className="p-3 sm:p-5 w-full space-y-3">
         {/* Tab 1: Menu & Resep Cloud */}
         {activeTab === 'menu' && (
           <MenuSegment outletId={currentOutlet.id} userId={user.id} />

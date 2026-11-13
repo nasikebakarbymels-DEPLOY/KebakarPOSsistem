@@ -11,7 +11,6 @@ import {
   Eye,
   Calendar,
   Building2,
-  Layers,
   Sparkles,
   Loader2,
 } from 'lucide-react';
@@ -213,11 +212,11 @@ export const PembelianSegment: React.FC<PembelianSegmentProps> = ({ outletId, us
   }, [filteredPembelian]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Toast Notification */}
       {toast && (
         <div
-          className={`p-3.5 rounded-xl border text-xs font-semibold flex items-center justify-between gap-2 shadow-sm animate-in fade-in ${
+          className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-between gap-2 shadow-sm animate-in fade-in ${
             toast.type === 'success'
               ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
               : 'bg-rose-50 text-rose-800 border-rose-200'
@@ -248,30 +247,30 @@ export const PembelianSegment: React.FC<PembelianSegmentProps> = ({ outletId, us
         </div>
       )}
 
-      {/* Header Kontrol: Judul, Search, Filter Bulan & Tombol Tambah */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
-            <ShoppingBag className="w-5 h-5 text-orange-600" />
-            <span>Pembelian Bahan Baku</span>
+      {/* Header Kontrol (Compact) */}
+      <div className="flex items-center justify-between gap-2.5 bg-white px-3.5 py-2.5 rounded-2xl border border-stone-200 shadow-2xs">
+        <div className="min-w-0">
+          <h2 className="text-sm sm:text-base font-black text-stone-900 flex items-center gap-1.5 truncate">
+            <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600 shrink-0" />
+            <span className="truncate">Pembelian Bahan Baku</span>
           </h2>
-          <p className="text-xs text-stone-500 mt-0.5">
-            Pencatatan pengeluaran belanja bahan yang otomatis memperbarui harga acuan resep HPP
+          <p className="text-[11px] text-stone-500 truncate">
+            Belanja bahan & pembaruan harga acuan HPP
           </p>
         </div>
 
         <button
           type="button"
           onClick={handleOpenCreate}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-sm transition shrink-0"
+          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-sm transition shrink-0"
         >
-          <Plus className="w-4 h-4" />
-          <span>Catat Pembelian</span>
+          <Plus className="w-3.5 h-3.5" />
+          <span>Catat</span>
         </button>
       </div>
 
       {/* Baris Filter: Search & Segmented Bulan */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
         {/* Search Bar */}
         <div className="relative flex-1">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
@@ -279,17 +278,17 @@ export const PembelianSegment: React.FC<PembelianSegmentProps> = ({ outletId, us
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari vendor supplier, item bahan, kemasan..."
+            placeholder="Cari vendor supplier, bahan, kemasan..."
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-stone-200 bg-white text-xs text-stone-900 focus:outline-hidden focus:ring-2 focus:ring-orange-500 placeholder:text-stone-400 shadow-2xs"
           />
         </div>
 
         {/* Filter Bulan Segmented */}
-        <div className="flex bg-stone-200/80 p-1 rounded-xl gap-1 shrink-0 text-xs font-bold overflow-x-auto max-w-full">
+        <div className="flex bg-stone-200/80 p-0.5 rounded-xl gap-1 shrink-0 text-[11px] font-bold overflow-x-auto max-w-full">
           <button
             type="button"
             onClick={() => setFilterBulan('semua')}
-            className={`px-3 py-1.5 rounded-lg transition whitespace-nowrap shrink-0 ${
+            className={`px-2.5 py-1.5 rounded-lg transition whitespace-nowrap shrink-0 ${
               filterBulan === 'semua'
                 ? 'bg-white text-stone-900 shadow-xs'
                 : 'text-stone-600 hover:text-stone-900'
@@ -300,7 +299,7 @@ export const PembelianSegment: React.FC<PembelianSegmentProps> = ({ outletId, us
           <button
             type="button"
             onClick={() => setFilterBulan('bulan_ini')}
-            className={`px-3 py-1.5 rounded-lg transition whitespace-nowrap shrink-0 ${
+            className={`px-2.5 py-1.5 rounded-lg transition whitespace-nowrap shrink-0 ${
               filterBulan === 'bulan_ini'
                 ? 'bg-white text-stone-900 shadow-xs'
                 : 'text-stone-600 hover:text-stone-900'
@@ -311,7 +310,7 @@ export const PembelianSegment: React.FC<PembelianSegmentProps> = ({ outletId, us
           <button
             type="button"
             onClick={() => setFilterBulan('bulan_lalu')}
-            className={`px-3 py-1.5 rounded-lg transition whitespace-nowrap shrink-0 ${
+            className={`px-2.5 py-1.5 rounded-lg transition whitespace-nowrap shrink-0 ${
               filterBulan === 'bulan_lalu'
                 ? 'bg-white text-stone-900 shadow-xs'
                 : 'text-stone-600 hover:text-stone-900'
@@ -324,15 +323,12 @@ export const PembelianSegment: React.FC<PembelianSegmentProps> = ({ outletId, us
 
       {/* Info Ringkasan Belanja Terfilter */}
       {!loading && !loadError && filteredPembelian.length > 0 && (
-        <div className="px-3.5 py-2.5 rounded-xl bg-orange-50/60 border border-orange-200/70 flex items-center justify-between text-xs text-orange-950">
-          <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-stone-600">Menampilkan:</span>
-            <strong className="text-orange-900">
-              {filteredPembelian.length} transaksi pembelian
-            </strong>
-          </div>
+        <div className="px-3 py-2 rounded-xl bg-orange-50/70 border border-orange-200/70 flex items-center justify-between text-xs text-orange-950">
+          <span className="font-semibold text-stone-600">
+            <strong className="text-orange-900">{filteredPembelian.length}</strong> transaksi
+          </span>
           <div className="font-bold">
-            Total Belanja:{' '}
+            Total:{' '}
             <span className="font-black text-orange-700">
               {formatRupiah(totalPengeluaranFiltered)}
             </span>
@@ -343,23 +339,17 @@ export const PembelianSegment: React.FC<PembelianSegmentProps> = ({ outletId, us
       {/* Konten Utama */}
       {loading ? (
         /* Skeleton Loading State */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 animate-pulse">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 animate-pulse">
           {[1, 2, 3].map((n) => (
             <div
               key={n}
-              className="bg-white rounded-2xl p-4 border border-stone-200 shadow-2xs space-y-3"
+              className="bg-white rounded-xl p-3 border border-stone-200 shadow-2xs space-y-2"
             >
               <div className="flex items-center justify-between">
-                <div className="h-4 bg-stone-200 rounded-md w-1/3" />
-                <div className="h-4 bg-stone-200 rounded-md w-1/4" />
+                <div className="h-3.5 bg-stone-200 rounded w-1/3" />
+                <div className="h-3.5 bg-stone-200 rounded w-1/4" />
               </div>
-              <div className="h-6 bg-stone-100 rounded-lg w-1/2" />
-              <div className="h-10 bg-stone-50 rounded-xl w-full" />
-              <div className="flex justify-end gap-2 pt-2 border-t border-stone-100">
-                <div className="h-7 w-7 bg-stone-200 rounded-lg" />
-                <div className="h-7 w-7 bg-stone-200 rounded-lg" />
-                <div className="h-7 w-7 bg-stone-200 rounded-lg" />
-              </div>
+              <div className="h-10 bg-stone-50 rounded-lg w-full" />
             </div>
           ))}
         </div>
@@ -425,52 +415,74 @@ export const PembelianSegment: React.FC<PembelianSegmentProps> = ({ outletId, us
           </button>
         </div>
       ) : (
-        /* Grid Card Pembelian */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+        /* Grid Card Pembelian (Ringkas & Hemat Ruang) */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
           {filteredPembelian.map((p) => {
             const hasAcuanItem = (p.items || []).some((it) => it.isAcuanKemasan);
 
             return (
               <div
                 key={p.id}
-                className="bg-white rounded-2xl p-4 border border-stone-200 shadow-2xs hover:shadow-xs transition flex flex-col justify-between space-y-3"
+                className="bg-white rounded-xl p-3 border border-stone-200 shadow-2xs hover:shadow-xs transition flex flex-col justify-between space-y-2"
               >
-                {/* Header Card: Tanggal & Supplier */}
+                {/* Header Card: Supplier, Tanggal & Actions */}
                 <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-1.5 text-stone-500 text-[11px] font-medium">
-                      <Calendar className="w-3.5 h-3.5 text-stone-400" />
-                      <span>{formatTanggalIndo(p.tanggal)}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-stone-900 text-sm truncate flex items-center gap-1">
+                        <Building2 className="w-3.5 h-3.5 text-stone-500 shrink-0" />
+                        <span className="truncate">{p.supplier}</span>
+                      </span>
+                      {hasAcuanItem && (
+                        <span
+                          title="Memperbarui harga acuan resep"
+                          className="px-1.5 py-0.2 rounded bg-amber-50 text-amber-900 border border-amber-200 text-[10px] font-bold inline-flex items-center gap-0.5 shrink-0"
+                        >
+                          <Sparkles className="w-2.5 h-2.5 text-amber-600" />
+                          <span>Acuan HPP</span>
+                        </span>
+                      )}
                     </div>
-                    <div className="font-bold text-stone-900 text-sm mt-0.5 flex items-center gap-1.5">
-                      <Building2 className="w-3.5 h-3.5 text-stone-500 shrink-0" />
-                      <span className="truncate">{p.supplier}</span>
+                    <div className="flex items-center gap-1 text-stone-500 text-[10.5px] font-medium mt-0.5">
+                      <Calendar className="w-3 h-3 text-stone-400" />
+                      <span>{formatTanggalIndo(p.tanggal)}</span>
+                      <span className="text-stone-300">•</span>
+                      <span>{p.items?.length || 0} item</span>
                     </div>
                   </div>
 
-                  {hasAcuanItem && (
-                    <span
-                      title="Memperbarui harga acuan resep"
-                      className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 text-[10px] font-bold flex items-center gap-1 shrink-0"
+                  {/* Quick Actions */}
+                  <div className="flex items-center gap-0.5 shrink-0 -mr-1 -mt-1">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDetail(p)}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-800 hover:bg-stone-100 transition"
+                      title="Detail Pembelian"
                     >
-                      <Sparkles className="w-3 h-3 text-amber-600" />
-                      <span>Acuan HPP</span>
-                    </span>
-                  )}
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEdit(p)}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-800 hover:bg-stone-100 transition"
+                      title="Edit Pembelian"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeletingPembelian(p)}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-rose-600 active:text-rose-700 hover:bg-rose-50 active:bg-rose-100 transition"
+                      title="Hapus Pembelian"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
-                {/* Box Ringkasan Item & Total Rupiah */}
-                <div className="p-3 rounded-xl bg-stone-50 border border-stone-200/70 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-stone-500 flex items-center gap-1">
-                      <Layers className="w-3.5 h-3.5 text-stone-400" />
-                      <span>Jumlah Item:</span>
-                    </span>
-                    <span className="font-bold text-stone-900">{p.items?.length || 0} item</span>
-                  </div>
-
-                  {/* List Ringkas Item */}
-                  <div className="space-y-1 pt-1.5 border-t border-stone-200/60 max-h-24 overflow-y-auto pr-1">
+                {/* Box Ringkasan Item & Total */}
+                <div className="px-2.5 py-2 rounded-lg bg-stone-50 border border-stone-200/70 space-y-1.5">
+                  <div className="space-y-0.5 max-h-20 overflow-y-auto pr-1">
                     {(p.items || []).map((it, idx) => (
                       <div
                         key={idx}
@@ -486,10 +498,9 @@ export const PembelianSegment: React.FC<PembelianSegmentProps> = ({ outletId, us
                     ))}
                   </div>
 
-                  {/* Total Pembelian */}
-                  <div className="pt-2 border-t border-stone-200/80 flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-stone-700">Total Belanja:</span>
-                    <span className="text-sm font-black text-orange-700">
+                  <div className="pt-1.5 border-t border-stone-200/80 flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-stone-600">Total Belanja</span>
+                    <span className="text-xs sm:text-sm font-black text-orange-700">
                       {formatRupiah(p.totalPembelian)}
                     </span>
                   </div>
@@ -497,40 +508,10 @@ export const PembelianSegment: React.FC<PembelianSegmentProps> = ({ outletId, us
 
                 {/* Catatan jika ada */}
                 {p.catatan && (
-                  <p className="text-[11px] text-stone-500 italic truncate px-0.5">
+                  <p className="text-[10.5px] text-stone-500 italic truncate px-0.5">
                     "{p.catatan}"
                   </p>
                 )}
-
-                {/* Actions: Detail, Edit, Hapus */}
-                <div className="flex items-center justify-end gap-1 pt-2 border-t border-stone-100">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedDetail(p)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-stone-600 hover:text-stone-900 hover:bg-stone-100 font-bold text-[11px] transition"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>Detail</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleOpenEdit(p)}
-                    className="p-1.5 rounded-lg text-stone-400 hover:text-stone-800 hover:bg-stone-100 transition"
-                    title="Edit Pembelian"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setDeletingPembelian(p)}
-                    className="p-1.5 rounded-lg text-stone-400 hover:text-rose-600 active:text-rose-700 hover:bg-rose-50 active:bg-rose-100 transition"
-                    title="Hapus Pembelian"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
               </div>
             );
           })}

@@ -49,6 +49,25 @@ export const BahanSegment: React.FC<BahanSegmentProps> = ({ outletId, userId }) 
   // State Riwayat Harga Collapsible (Default: Collapsed)
   const [expandedRiwayatBahanIds, setExpandedRiwayatBahanIds] = useState<Set<string>>(new Set());
 
+  // Kepadatan tampilan daftar: 'comfortable' (kartu ringkas) | 'compact' (baris daftar 1-baris)
+  const [density, setDensity] = useState<'comfortable' | 'compact'>(() => {
+    try {
+      const saved = localStorage.getItem('pos_bahan_density');
+      return saved === 'compact' ? 'compact' : 'comfortable';
+    } catch {
+      return 'comfortable';
+    }
+  });
+
+  const handleDensityChange = (next: 'comfortable' | 'compact') => {
+    setDensity(next);
+    try {
+      localStorage.setItem('pos_bahan_density', next);
+    } catch {
+      // Abaikan jika storage penuh
+    }
+  };
+
   const toggleRiwayat = (bahanId: string) => {
     setExpandedRiwayatBahanIds((prev) => {
       const next = new Set(prev);
@@ -174,11 +193,11 @@ export const BahanSegment: React.FC<BahanSegmentProps> = ({ outletId, userId }) 
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Toast Notification */}
       {toast && (
         <div
-          className={`p-3.5 rounded-xl border text-xs font-semibold flex items-center justify-between gap-2 shadow-sm animate-in fade-in ${
+          className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-between gap-2 shadow-sm animate-in fade-in ${
             toast.type === 'success'
               ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
               : 'bg-rose-50 text-rose-800 border-rose-200'
@@ -209,70 +228,94 @@ export const BahanSegment: React.FC<BahanSegmentProps> = ({ outletId, userId }) 
         </div>
       )}
 
-      {/* Header Segmen & Action */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-stone-200 shadow-2xs">
-        <div>
-          <h2 className="text-base font-black text-stone-900 flex items-center gap-2">
-            <Package className="w-5 h-5 text-orange-600" />
-            <span>Katalog Bahan Baku</span>
+      {/* Header Segmen & Action (Compact) */}
+      <div className="flex items-center justify-between gap-2.5 bg-white px-3.5 py-2.5 rounded-2xl border border-stone-200 shadow-2xs">
+        <div className="min-w-0">
+          <h2 className="text-sm sm:text-base font-black text-stone-900 flex items-center gap-1.5 truncate">
+            <Package className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600 shrink-0" />
+            <span className="truncate">Katalog Bahan Baku</span>
           </h2>
-          <p className="text-xs text-stone-500 mt-0.5">
-            Kelola satuan dasar, kemasan beli, dan harga acuan HPP resep produk
+          <p className="text-[11px] text-stone-500 truncate">
+            Satuan dasar, kemasan & acuan HPP ({bahanList.length} bahan)
           </p>
         </div>
 
         <button
           type="button"
           onClick={handleOpenCreate}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white font-bold text-xs shadow-sm transition shrink-0"
+          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white font-bold text-xs shadow-sm transition shrink-0"
         >
-          <Plus className="w-4 h-4" />
-          <span>Tambah Bahan</span>
+          <Plus className="w-3.5 h-3.5" />
+          <span>Tambah</span>
         </button>
       </div>
 
-      {/* Search Bar */}
-      <div className="relative">
-        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-400">
-          <Search className="w-4 h-4" />
+      {/* Search Bar + Toggle Kepadatan */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 min-w-0">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-stone-400">
+            <Search className="w-4 h-4" />
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Cari bahan, kemasan..."
+            className="w-full pl-9 pr-12 py-2 rounded-xl text-xs sm:text-sm border border-stone-200 bg-white text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 transition shadow-2xs"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-[11px] font-semibold text-stone-400 hover:text-stone-600"
+            >
+              Hapus
+            </button>
+          )}
         </div>
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Cari nama bahan, kemasan, atau catatan..."
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl text-xs sm:text-sm border border-stone-200 bg-white text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 transition shadow-2xs"
-        />
-        {searchQuery && (
+
+        <div className="flex items-center p-0.5 bg-stone-200/80 rounded-xl border border-stone-200 shrink-0">
           <button
             type="button"
-            onClick={() => setSearchQuery('')}
-            className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-xs text-stone-400 hover:text-stone-600"
+            onClick={() => handleDensityChange('comfortable')}
+            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition ${
+              density === 'comfortable'
+                ? 'bg-white text-stone-900 shadow-2xs'
+                : 'text-stone-500 hover:text-stone-800'
+            }`}
           >
-            Hapus
+            Kartu
           </button>
-        )}
+          <button
+            type="button"
+            onClick={() => handleDensityChange('compact')}
+            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition ${
+              density === 'compact'
+                ? 'bg-white text-stone-900 shadow-2xs'
+                : 'text-stone-500 hover:text-stone-800'
+            }`}
+          >
+            Ringkas
+          </button>
+        </div>
       </div>
 
       {/* Content State: Skeleton, Error, Empty, atau Grid Card */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="bg-white rounded-2xl p-4 border border-stone-200 shadow-2xs animate-pulse space-y-3"
+              className="bg-white rounded-xl p-3 border border-stone-200 shadow-2xs animate-pulse space-y-2"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-stone-200 shrink-0" />
-                <div className="flex-1 space-y-1.5">
-                  <div className="h-4 bg-stone-200 rounded w-3/4" />
-                  <div className="h-3 bg-stone-100 rounded w-1/3" />
+                <div className="w-8 h-8 rounded-lg bg-stone-200 shrink-0" />
+                <div className="flex-1 space-y-1">
+                  <div className="h-3.5 bg-stone-200 rounded w-3/4" />
+                  <div className="h-2.5 bg-stone-100 rounded w-1/3" />
                 </div>
               </div>
-              <div className="space-y-1.5 pt-2 border-t border-stone-100">
-                <div className="h-3 bg-stone-100 rounded w-full" />
-                <div className="h-3 bg-stone-100 rounded w-2/3" />
-              </div>
+              <div className="h-8 bg-stone-100 rounded-lg w-full" />
             </div>
           ))}
         </div>
@@ -329,49 +372,62 @@ export const BahanSegment: React.FC<BahanSegmentProps> = ({ outletId, userId }) 
             Bersihkan pencarian
           </button>
         </div>
-      ) : (
-        /* Grid Card Bahan */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+      ) : density === 'compact' ? (
+        /* Mode Ringkas: Daftar 1-baris padat */
+        <div className="bg-white rounded-2xl border border-stone-200 divide-y divide-stone-100 shadow-2xs overflow-hidden">
           {filteredBahan.map((bahan) => {
             const acuanKemasan = (bahan.kemasanList || []).find((k) => k.acuan) || bahan.kemasanList?.[0];
             const isRiwayatExpanded = expandedRiwayatBahanIds.has(bahan.id);
             const riwayatList = bahan.riwayatHarga || [];
 
             return (
-              <div
-                key={bahan.id}
-                className="bg-white rounded-2xl p-4 border border-stone-200 shadow-2xs hover:shadow-xs transition flex flex-col justify-between space-y-3"
-              >
-                {/* Header Card: Nama (text-base), Satuan Dasar & Actions */}
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="text-base font-bold text-stone-900 leading-snug">{bahan.nama}</h3>
-                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-stone-100 text-stone-700 capitalize">
-                        Satuan Dasar: {bahan.satuanDasar}
+              <div key={bahan.id} className="px-3 py-2 hover:bg-stone-50/70 transition">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs sm:text-sm font-bold text-stone-900 truncate">
+                        {bahan.nama}
                       </span>
-                      {bahan.sku && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-stone-100 text-stone-600 font-mono">
-                          SKU: {bahan.sku}
-                        </span>
-                      )}
+                      <span className="text-[10px] font-semibold text-stone-500 capitalize shrink-0">
+                        · {bahan.satuanDasar}
+                      </span>
+                    </div>
+                    <div className="text-[10.5px] text-stone-400 truncate flex items-center gap-1.5">
+                      {acuanKemasan && <span>Acuan: {acuanKemasan.nama}</span>}
+                      {bahan.sku && <span className="font-mono">· {bahan.sku}</span>}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-xs sm:text-sm font-black text-orange-700 font-mono mr-1">
+                      {formatBiayaSatuan(bahan.hargaPerSatuanDasar, bahan.satuanDasar)}
+                    </span>
+
+                    {riwayatList.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => toggleRiwayat(bahan.id)}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition"
+                        title={`Riwayat harga (${riwayatList.length})`}
+                      >
+                        <History className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => handleOpenEdit(bahan)}
-                      className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition"
                       title="Edit Bahan"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
+
                     <button
                       type="button"
                       disabled={checkingDeleteId === bahan.id}
                       onClick={() => handleRequestDelete(bahan)}
-                      className="p-1.5 rounded-lg text-stone-400 hover:text-rose-600 active:text-rose-700 hover:bg-rose-50 active:bg-rose-100 transition disabled:opacity-50"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-rose-600 active:text-rose-700 hover:bg-rose-50 transition disabled:opacity-50"
                       title="Hapus Bahan"
                     >
                       {checkingDeleteId === bahan.id ? (
@@ -383,61 +439,144 @@ export const BahanSegment: React.FC<BahanSegmentProps> = ({ outletId, userId }) 
                   </div>
                 </div>
 
-                {/* Box Biaya Acuan Satuan Dasar (p-3) */}
-                <div className="p-3 rounded-xl bg-orange-50/60 border border-orange-200/70 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] font-bold text-orange-950 block">
-                      Harga Acuan Resep
-                    </span>
-                    <span className="text-[10px] text-orange-800/80">
-                      {acuanKemasan ? `Dari ${acuanKemasan.nama}` : 'Belum diset'}
-                    </span>
-                  </div>
-                  <div className="text-xs sm:text-sm font-black text-orange-700 font-mono">
-                    {formatBiayaSatuan(bahan.hargaPerSatuanDasar, bahan.satuanDasar)}
-                  </div>
-                </div>
-
-                {/* Daftar Kemasan Pembelian Chips */}
-                <div>
-                  <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1.5">
-                    Kemasan Pembelian ({bahan.kemasanList?.length || 0})
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(bahan.kemasanList || []).map((k) => (
-                      <span
-                        key={k.id}
-                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium border ${
-                          k.acuan
-                            ? 'bg-amber-50 text-amber-900 border-amber-300 font-bold'
-                            : 'bg-stone-50 text-stone-700 border-stone-200'
-                        }`}
+                {isRiwayatExpanded && riwayatList.length > 0 && (
+                  <div className="mt-2 pt-1.5 border-t border-stone-100 space-y-1">
+                    {riwayatList.map((r, rIdx) => (
+                      <div
+                        key={rIdx}
+                        className="flex items-center justify-between text-[10.5px] bg-stone-50 px-2 py-1 rounded-md"
                       >
-                        {k.acuan && <Sparkles className="w-3 h-3 text-amber-600 shrink-0" />}
-                        <span>{k.nama}</span>
-                        <span className="text-stone-400">
-                          ({formatQuantityKemasan(k.isi ?? k.netto, bahan.satuanDasar)})
+                        <span className="text-stone-500">{formatDateTimeIndo(r.tanggal)}</span>
+                        <span className="font-bold text-stone-800 font-mono">
+                          {formatBiayaSatuan(r.hargaPerSatuanDasar, bahan.satuanDasar)}
                         </span>
-                        {typeof k.hargaPerKemasan === 'number' && k.hargaPerKemasan > 0 && (
-                          <span className="text-stone-900 font-bold ml-0.5">
-                            {formatRupiah(k.hargaPerKemasan)}
-                          </span>
-                        )}
-                      </span>
+                      </div>
                     ))}
                   </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* Grid Card Bahan (Ringkas & Hemat Ruang) */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          {filteredBahan.map((bahan) => {
+            const acuanKemasan = (bahan.kemasanList || []).find((k) => k.acuan) || bahan.kemasanList?.[0];
+            const isRiwayatExpanded = expandedRiwayatBahanIds.has(bahan.id);
+            const riwayatList = bahan.riwayatHarga || [];
+            const kemasanList = bahan.kemasanList || [];
+
+            return (
+              <div
+                key={bahan.id}
+                className="bg-white rounded-xl p-3 border border-stone-200 shadow-2xs hover:shadow-xs transition flex flex-col justify-between space-y-2"
+              >
+                {/* Header Card: Nama, Satuan Dasar/SKU sebaris & Actions */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-sm font-bold text-stone-900 leading-snug truncate">
+                      {bahan.nama}
+                    </h3>
+                    <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-stone-500 flex-wrap">
+                      <span className="font-semibold text-stone-600 capitalize">
+                        {bahan.satuanDasar}
+                      </span>
+                      {bahan.sku && (
+                        <>
+                          <span className="text-stone-300">•</span>
+                          <span className="font-mono text-[10px] text-stone-400">
+                            {bahan.sku}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-0.5 shrink-0 -mr-1 -mt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEdit(bahan)}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition"
+                      title="Edit Bahan"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={checkingDeleteId === bahan.id}
+                      onClick={() => handleRequestDelete(bahan)}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-rose-600 active:text-rose-700 hover:bg-rose-50 active:bg-rose-100 transition disabled:opacity-50"
+                      title="Hapus Bahan"
+                    >
+                      {checkingDeleteId === bahan.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-stone-500" />
+                      ) : (
+                        <Trash2 className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
-                {/* Riwayat Harga (Collapsible default dengan toggle Riwayat harga (n)) */}
-                <div className="pt-2 border-t border-stone-100">
+                {/* Box Biaya Acuan 1 Baris */}
+                <div className="px-2.5 py-1.5 rounded-lg bg-orange-50/70 border border-orange-200/70 flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-orange-950 truncate">
+                    Acuan{acuanKemasan ? `: ${acuanKemasan.nama}` : ''}
+                  </span>
+                  <span className="text-xs sm:text-sm font-black text-orange-700 font-mono shrink-0">
+                    {formatBiayaSatuan(bahan.hargaPerSatuanDasar, bahan.satuanDasar)}
+                  </span>
+                </div>
+
+                {/* Daftar Kemasan Pembelian Chips (Hemat ruang & tanpa redundansi kurung) */}
+                {kemasanList.length > 0 && (
+                  <div className="flex items-center flex-wrap gap-1">
+                    {kemasanList.length > 1 && (
+                      <span className="text-[10px] font-bold text-stone-400 mr-0.5">
+                        Kemasan ({kemasanList.length}):
+                      </span>
+                    )}
+                    {kemasanList.map((k) => {
+                      const qtyLabel = formatQuantityKemasan(k.isi ?? k.netto, bahan.satuanDasar);
+                      const normNama = k.nama.toLowerCase().replace(/\s+/g, '');
+                      const normQty = qtyLabel.toLowerCase().replace(/\s+/g, '');
+                      const showQtyParen = Boolean(qtyLabel) && !normNama.includes(normQty);
+
+                      return (
+                        <span
+                          key={k.id}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] border ${
+                            k.acuan
+                              ? 'bg-amber-50 text-amber-900 border-amber-300 font-bold'
+                              : 'bg-stone-50 text-stone-700 border-stone-200 font-medium'
+                          }`}
+                        >
+                          {k.acuan && <Sparkles className="w-2.5 h-2.5 text-amber-600 shrink-0" />}
+                          <span>{k.nama}</span>
+                          {showQtyParen && (
+                            <span className="text-stone-400">({qtyLabel})</span>
+                          )}
+                          {typeof k.hargaPerKemasan === 'number' && k.hargaPerKemasan > 0 && (
+                            <span className="text-stone-900 font-bold ml-0.5">
+                              {formatRupiah(k.hargaPerKemasan)}
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Riwayat Harga (Collapsible default) */}
+                <div className="pt-1.5 border-t border-stone-100">
                   <button
                     type="button"
                     onClick={() => toggleRiwayat(bahan.id)}
                     disabled={riwayatList.length === 0}
-                    className="w-full flex items-center justify-between text-[11px] font-bold text-stone-600 hover:text-stone-900 transition py-0.5 disabled:opacity-60 disabled:cursor-default"
+                    className="w-full flex items-center justify-between text-[11px] font-semibold text-stone-500 hover:text-stone-900 transition py-0.5 disabled:opacity-60 disabled:cursor-default"
                   >
                     <div className="flex items-center gap-1.5">
-                      <History className="w-3.5 h-3.5 text-stone-400" />
+                      <History className="w-3 h-3 text-stone-400" />
                       <span>Riwayat harga ({riwayatList.length})</span>
                     </div>
                     {riwayatList.length > 0 && (
@@ -450,11 +589,11 @@ export const BahanSegment: React.FC<BahanSegmentProps> = ({ outletId, userId }) 
                   </button>
 
                   {isRiwayatExpanded && riwayatList.length > 0 && (
-                    <div className="mt-2 space-y-1.5 animate-in fade-in duration-150">
+                    <div className="mt-1.5 space-y-1 animate-in fade-in duration-150">
                       {riwayatList.map((r, rIdx) => (
                         <div
                           key={rIdx}
-                          className="flex items-center justify-between text-[11px] bg-stone-50 px-2.5 py-1.5 rounded-lg border border-stone-100"
+                          className="flex items-center justify-between text-[10.5px] bg-stone-50 px-2 py-1 rounded-md border border-stone-100"
                         >
                           <span className="text-stone-500 font-medium">
                             {formatDateTimeIndo(r.tanggal)}
@@ -470,7 +609,7 @@ export const BahanSegment: React.FC<BahanSegmentProps> = ({ outletId, userId }) 
 
                 {/* Catatan jika ada */}
                 {bahan.catatan && (
-                  <p className="text-[11px] text-stone-500 italic line-clamp-2 pt-1 border-t border-stone-100">
+                  <p className="text-[10.5px] text-stone-500 italic line-clamp-1 pt-1 border-t border-stone-100">
                     "{bahan.catatan}"
                   </p>
                 )}
