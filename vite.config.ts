@@ -24,7 +24,7 @@ export default defineConfig(() => {
           description: 'Aplikasi POS F&B multi-outlet berbasis PWA dengan role-based access dan navigasi mobile-first.',
           theme_color: '#ffffff',
           background_color: '#ffffff',
-          display: 'standalone',
+          display: 'fullscreen',
           start_url: '/',
           scope: '/',
           icons: [
