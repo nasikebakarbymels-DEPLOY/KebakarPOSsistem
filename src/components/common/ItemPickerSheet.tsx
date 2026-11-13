@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Search, Ban } from 'lucide-react';
 
 export interface ItemPickerOption {
@@ -42,6 +43,7 @@ export const ItemPickerSheet: React.FC<ItemPickerSheetProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewportStyle, setViewportStyle] = useState<{ top: number; height: number } | null>(null);
+  const maxInnerHeightRef = useRef<number>(0);
 
   // Reset pencarian saat modal dibuka
   useEffect(() => {
@@ -50,29 +52,51 @@ export const ItemPickerSheet: React.FC<ItemPickerSheetProps> = ({
     }
   }, [isOpen]);
 
-  // Sinkronkan tinggi & posisi sheet dengan visualViewport agar tidak tertutup keyboard HP
+  // Sinkronkan tinggi sheet hanya jika browser tidak mendukung interactive-widget=resizes-content (mis. iOS Safari).
+  // Di Android Chrome, resizes-content sudah mengecilkan `fixed inset-0` agar menempel di atas keyboard;
+  // menimpa dengan visualViewport.height saat keyboard ditutup-buka bisa membuat sheet mengambang di atas keyboard.
   useEffect(() => {
     if (!isOpen || typeof window === 'undefined') {
       setViewportStyle(null);
+      maxInnerHeightRef.current = 0;
       return;
     }
 
-    const vv = window.visualViewport;
-    if (!vv) return;
+    maxInnerHeightRef.current = Math.max(maxInnerHeightRef.current, window.innerHeight);
 
     const updateViewport = () => {
-      setViewportStyle({
-        top: vv.offsetTop,
-        height: vv.height,
-      });
+      const ih = window.innerHeight;
+      maxInnerHeightRef.current = Math.max(maxInnerHeightRef.current, ih);
+      const vv = window.visualViewport;
+      if (!vv) {
+        setViewportStyle(null);
+        return;
+      }
+
+      const layoutAlreadyShrank =
+        maxInnerHeightRef.current - ih > 60 || ih < window.screen.height * 0.72;
+      const visualOnlyKeyboardOpen =
+        !layoutAlreadyShrank && ih - vv.height > 80 && vv.scale <= 1.05;
+
+      if (visualOnlyKeyboardOpen) {
+        setViewportStyle({
+          top: vv.offsetTop,
+          height: vv.height,
+        });
+      } else {
+        setViewportStyle(null);
+      }
     };
 
     updateViewport();
-    vv.addEventListener('resize', updateViewport);
-    vv.addEventListener('scroll', updateViewport);
+    const vv = window.visualViewport;
+    window.addEventListener('resize', updateViewport);
+    vv?.addEventListener('resize', updateViewport);
+    vv?.addEventListener('scroll', updateViewport);
     return () => {
-      vv.removeEventListener('resize', updateViewport);
-      vv.removeEventListener('scroll', updateViewport);
+      window.removeEventListener('resize', updateViewport);
+      vv?.removeEventListener('resize', updateViewport);
+      vv?.removeEventListener('scroll', updateViewport);
     };
   }, [isOpen]);
 
@@ -87,7 +111,7 @@ export const ItemPickerSheet: React.FC<ItemPickerSheetProps> = ({
     );
   }, [items, searchQuery]);
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === 'undefined') return null;
 
   const handleSelect = (item: ItemPickerOption) => {
     if (item.disabled) return;
@@ -111,9 +135,9 @@ export const ItemPickerSheet: React.FC<ItemPickerSheetProps> = ({
     }
   };
 
-  return (
+  const sheetContent = (
     <div
-      className="fixed inset-x-0 z-50 flex flex-col justify-end sm:justify-center sm:items-center p-0 sm:p-4 animate-in fade-in duration-150"
+      className="fixed inset-x-0 z-[70] flex flex-col justify-end sm:justify-center sm:items-center p-0 sm:p-4"
       style={
         viewportStyle
           ? { top: `${viewportStyle.top}px`, height: `${viewportStyle.height}px` }
@@ -127,12 +151,12 @@ export const ItemPickerSheet: React.FC<ItemPickerSheetProps> = ({
         aria-hidden="true"
       />
 
-      {/* Sheet Container: Bottom sheet on mobile (menyesuaikan tinggi visualViewport di atas keyboard), centered dialog on desktop */}
+      {/* Sheet Container: Menempel di bottom (tepat di atas keyboard) pada mobile, dialog terpusat pada desktop */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="picker-sheet-title"
-        className="relative z-10 w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[calc(100%-12px)] sm:max-h-[80dvh] overflow-hidden border border-stone-200 animate-in slide-in-from-bottom sm:slide-in-from-bottom-2 duration-200"
+        className="relative z-10 w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[calc(100%-12px)] sm:max-h-[80dvh] overflow-hidden border border-stone-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Mobile Pull Handle */}
@@ -200,6 +224,11 @@ export const ItemPickerSheet: React.FC<ItemPickerSheetProps> = ({
               type="text"
               autoFocus
               value={searchQuery}
+              onFocus={() => {
+                if (typeof window !== 'undefined' && window.scrollY !== 0) {
+                  window.scrollTo(0, 0);
+                }
+              }}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={searchPlaceholder}
               className="w-full pl-9 pr-9 py-2 text-xs sm:text-sm font-semibold rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 bg-stone-50/50 transition placeholder:text-stone-400 placeholder:font-normal"
@@ -296,4 +325,6 @@ export const ItemPickerSheet: React.FC<ItemPickerSheetProps> = ({
       </div>
     </div>
   );
+
+  return createPortal(sheetContent, document.body);
 };

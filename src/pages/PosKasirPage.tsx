@@ -30,6 +30,101 @@ interface PosKasirPageProps {
   onNavigateToProdukTab?: () => void;
 }
 
+interface CartQtyInputProps {
+  qty: number;
+  itemName: string;
+  onChangeQty: (nextQty: number) => void;
+  size?: 'sm' | 'md';
+}
+
+const MAX_CART_QTY = 9999;
+
+const CartQtyInput: React.FC<CartQtyInputProps> = ({
+  qty,
+  itemName,
+  onChangeQty,
+  size = 'md',
+}) => {
+  const [draft, setDraft] = useState<string>(String(qty));
+  const [isFocused, setIsFocused] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!isFocused) {
+      setDraft(String(qty));
+    }
+  }, [qty, isFocused]);
+
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    setIsFocused(true);
+    setDraft(String(qty));
+    const el = e.currentTarget;
+    requestAnimationFrame(() => {
+      el.select();
+    });
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digitsOnly = e.target.value.replace(/\D/g, '');
+    if (digitsOnly === '') {
+      setDraft('');
+      return;
+    }
+
+    const parsed = parseInt(digitsOnly, 10);
+    if (Number.isNaN(parsed)) return;
+
+    const clamped = Math.min(MAX_CART_QTY, parsed);
+    setDraft(String(clamped));
+
+    if (clamped >= 1) {
+      onChangeQty(clamped);
+    }
+  };
+
+  const commitDraft = () => {
+    setIsFocused(false);
+    const parsed = parseInt(draft, 10);
+    if (Number.isNaN(parsed) || parsed < 1) {
+      setDraft(String(qty));
+      return;
+    }
+    const clamped = Math.min(MAX_CART_QTY, parsed);
+    setDraft(String(clamped));
+    if (clamped !== qty) {
+      onChangeQty(clamped);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.currentTarget.blur();
+    } else if (e.key === 'Escape') {
+      setDraft(String(qty));
+      setIsFocused(false);
+      e.currentTarget.blur();
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      enterKeyHint="done"
+      aria-label={`Jumlah ${itemName}`}
+      value={draft}
+      onFocus={handleFocus}
+      onChange={handleChange}
+      onBlur={commitDraft}
+      onKeyDown={handleKeyDown}
+      className={`${
+        size === 'sm' ? 'w-11 h-6 text-xs rounded-lg' : 'w-12 h-7 text-xs rounded-xl'
+      } text-center font-bold text-stone-900 bg-stone-50 border border-stone-200 focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 focus:outline-none tabular-nums transition`}
+    />
+  );
+};
+
 export const PosKasirPage: React.FC<PosKasirPageProps> = ({ onNavigateToProdukTab }) => {
   const { currentOutlet, user, isOnline } = useAuth();
   const pendingSyncCount = usePendingSyncCount(currentOutlet?.id);
@@ -205,6 +300,21 @@ export const PosKasirPage: React.FC<PosKasirPageProps> = ({ onNavigateToProdukTa
         })
         .filter((it): it is CartItemCheckout => it !== null);
     });
+  };
+
+  const handleSetQty = (itemId: string, rawQty: number) => {
+    const nextQty = Math.min(MAX_CART_QTY, Math.max(1, Math.floor(rawQty)));
+    setCartItems((prev) =>
+      prev.map((it) => {
+        if (it.id !== itemId) return it;
+        const { hargaNeto } = hitungHargaNeto(it.hargaJual, it.diskonProduk);
+        return {
+          ...it,
+          qty: nextQty,
+          subtotal: hargaNeto * nextQty,
+        };
+      })
+    );
   };
 
   const handleRemoveItem = (itemId: string) => {
@@ -441,10 +551,10 @@ export const PosKasirPage: React.FC<PosKasirPageProps> = ({ onNavigateToProdukTa
                           e.stopPropagation();
                           handleAddToCart(p);
                         }}
-                        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center font-bold transition shadow-2xs ${
+                        className={`h-7 sm:h-8 rounded-xl flex items-center justify-center font-bold text-xs transition shadow-2xs ${
                           inCart
-                            ? 'bg-orange-600 text-white'
-                            : 'bg-stone-100 group-hover:bg-orange-600 group-hover:text-white text-stone-700'
+                            ? 'min-w-[1.75rem] sm:min-w-[2rem] px-1.5 bg-orange-600 text-white tabular-nums'
+                            : 'w-7 sm:w-8 bg-stone-100 group-hover:bg-orange-600 group-hover:text-white text-stone-700'
                         }`}
                         title="Tambah ke pesanan"
                       >
@@ -501,23 +611,28 @@ export const PosKasirPage: React.FC<PosKasirPageProps> = ({ onNavigateToProdukTa
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-1 shrink-0">
                       <button
                         type="button"
                         onClick={() => handleUpdateQty(item.id, -1)}
                         className="w-6 h-6 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center transition"
+                        aria-label={`Kurangi jumlah ${item.nama}`}
                       >
                         <Minus className="w-3 h-3" />
                       </button>
 
-                      <span className="w-6 text-center text-xs font-bold text-stone-900">
-                        {item.qty}
-                      </span>
+                      <CartQtyInput
+                        qty={item.qty}
+                        itemName={item.nama}
+                        size="sm"
+                        onChangeQty={(nextQty) => handleSetQty(item.id, nextQty)}
+                      />
 
                       <button
                         type="button"
                         onClick={() => handleUpdateQty(item.id, 1)}
                         className="w-6 h-6 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center transition"
+                        aria-label={`Tambah jumlah ${item.nama}`}
                       >
                         <Plus className="w-3 h-3" />
                       </button>
@@ -587,10 +702,16 @@ export const PosKasirPage: React.FC<PosKasirPageProps> = ({ onNavigateToProdukTa
 
       {/* MOBILE CART BOTTOM SHEET */}
       {isMobileCartOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end bg-stone-900/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-t-3xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl border-t border-stone-200">
+        <div
+          onClick={() => setIsMobileCartOpen(false)}
+          className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end bg-stone-900/60 backdrop-blur-xs animate-in fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-t-3xl max-h-[85dvh] flex flex-col overflow-hidden shadow-2xl border-t border-stone-200"
+          >
             {/* Header Sheet */}
-            <div className="p-4 border-b border-stone-100 flex items-center justify-between bg-stone-50/80">
+            <div className="p-4 border-b border-stone-100 flex items-center justify-between bg-stone-50/80 shrink-0">
               <div className="flex items-center gap-2">
                 <ShoppingBag className="w-5 h-5 text-orange-600" />
                 <h3 className="font-bold text-sm text-stone-900">Rincian Keranjang</h3>
@@ -608,7 +729,7 @@ export const PosKasirPage: React.FC<PosKasirPageProps> = ({ onNavigateToProdukTa
             </div>
 
             {/* Body Sheet Items */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 divide-y divide-stone-100">
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 divide-y divide-stone-100">
               {cartItems.map((item) => (
                 <div key={item.id} className="pt-3 first:pt-0 flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">
@@ -618,21 +739,26 @@ export const PosKasirPage: React.FC<PosKasirPageProps> = ({ onNavigateToProdukTa
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1 shrink-0">
                     <button
                       type="button"
                       onClick={() => handleUpdateQty(item.id, -1)}
-                      className="w-7 h-7 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center"
+                      className="w-7 h-7 rounded-xl bg-stone-100 hover:bg-stone-200 active:scale-95 text-stone-700 flex items-center justify-center transition"
+                      aria-label={`Kurangi jumlah ${item.nama}`}
                     >
                       <Minus className="w-3.5 h-3.5" />
                     </button>
-                    <span className="w-7 text-center text-xs font-bold text-stone-900">
-                      {item.qty}
-                    </span>
+                    <CartQtyInput
+                      qty={item.qty}
+                      itemName={item.nama}
+                      size="md"
+                      onChangeQty={(nextQty) => handleSetQty(item.id, nextQty)}
+                    />
                     <button
                       type="button"
                       onClick={() => handleUpdateQty(item.id, 1)}
-                      className="w-7 h-7 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center"
+                      className="w-7 h-7 rounded-xl bg-stone-100 hover:bg-stone-200 active:scale-95 text-stone-700 flex items-center justify-center transition"
+                      aria-label={`Tambah jumlah ${item.nama}`}
                     >
                       <Plus className="w-3.5 h-3.5" />
                     </button>
@@ -640,6 +766,7 @@ export const PosKasirPage: React.FC<PosKasirPageProps> = ({ onNavigateToProdukTa
                       type="button"
                       onClick={() => handleRemoveItem(item.id)}
                       className="w-7 h-7 rounded-xl text-stone-300 hover:text-rose-600 flex items-center justify-center ml-1"
+                      aria-label={`Hapus ${item.nama}`}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -649,7 +776,7 @@ export const PosKasirPage: React.FC<PosKasirPageProps> = ({ onNavigateToProdukTa
             </div>
 
             {/* Footer Sheet */}
-            <div className="p-4 border-t border-stone-100 bg-stone-50/50 space-y-3 pb-8">
+            <div className="p-4 border-t border-stone-100 bg-stone-50/50 space-y-3 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] shrink-0">
               <div className="flex justify-between items-center text-stone-900">
                 <span className="text-xs font-bold text-stone-600">Total Tagihan:</span>
                 <span className="text-xl font-black text-stone-900">
