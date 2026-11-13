@@ -41,12 +41,39 @@ export const ItemPickerSheet: React.FC<ItemPickerSheetProps> = ({
   searchPlaceholder = 'Cari nama item...',
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewportStyle, setViewportStyle] = useState<{ top: number; height: number } | null>(null);
 
-  // Reset pencarian saat modal ditutup atau dibuka
+  // Reset pencarian saat modal dibuka
   useEffect(() => {
     if (isOpen) {
       setSearchQuery('');
     }
+  }, [isOpen]);
+
+  // Sinkronkan tinggi & posisi sheet dengan visualViewport agar tidak tertutup keyboard HP
+  useEffect(() => {
+    if (!isOpen || typeof window === 'undefined') {
+      setViewportStyle(null);
+      return;
+    }
+
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const updateViewport = () => {
+      setViewportStyle({
+        top: vv.offsetTop,
+        height: vv.height,
+      });
+    };
+
+    updateViewport();
+    vv.addEventListener('resize', updateViewport);
+    vv.addEventListener('scroll', updateViewport);
+    return () => {
+      vv.removeEventListener('resize', updateViewport);
+      vv.removeEventListener('scroll', updateViewport);
+    };
   }, [isOpen]);
 
   // Filter items berdasarkan kata kunci pencarian (case-insensitive)
@@ -85,7 +112,14 @@ export const ItemPickerSheet: React.FC<ItemPickerSheetProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center sm:items-center p-0 sm:p-4 animate-in fade-in duration-150">
+    <div
+      className="fixed inset-x-0 z-50 flex flex-col justify-end sm:justify-center sm:items-center p-0 sm:p-4 animate-in fade-in duration-150"
+      style={
+        viewportStyle
+          ? { top: `${viewportStyle.top}px`, height: `${viewportStyle.height}px` }
+          : { top: 0, bottom: 0 }
+      }
+    >
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
@@ -93,24 +127,24 @@ export const ItemPickerSheet: React.FC<ItemPickerSheetProps> = ({
         aria-hidden="true"
       />
 
-      {/* Sheet Container: Bottom sheet on mobile, centered dialog on desktop */}
+      {/* Sheet Container: Bottom sheet on mobile (menyesuaikan tinggi visualViewport di atas keyboard), centered dialog on desktop */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="picker-sheet-title"
-        className="relative z-10 w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[80vh] overflow-hidden border border-stone-200 animate-in slide-in-from-bottom sm:slide-in-from-bottom-2 duration-200"
+        className="relative z-10 w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[calc(100%-12px)] sm:max-h-[80dvh] overflow-hidden border border-stone-200 animate-in slide-in-from-bottom sm:slide-in-from-bottom-2 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Mobile Pull Handle */}
-        <div className="sm:hidden flex justify-center pt-2.5 pb-1">
+        <div className="sm:hidden flex justify-center pt-2 pb-0.5 shrink-0">
           <div className="w-10 h-1 bg-stone-300 rounded-full" />
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-stone-100">
+        <div className="shrink-0 flex items-center justify-between px-4 sm:px-5 py-2.5 border-b border-stone-100">
           <h3
             id="picker-sheet-title"
-            className="text-base font-bold text-stone-900 truncate"
+            className="text-sm sm:text-base font-bold text-stone-900 truncate"
           >
             {title}
           </h3>
@@ -126,7 +160,7 @@ export const ItemPickerSheet: React.FC<ItemPickerSheetProps> = ({
 
         {/* Tab Opsional */}
         {tabs && tabs.length > 0 && onTabChange && (
-          <div className="flex items-center px-4 sm:px-5 pt-2 border-b border-stone-100 gap-2 bg-stone-50/70 overflow-x-auto">
+          <div className="shrink-0 flex items-center px-4 sm:px-5 pt-1.5 border-b border-stone-100 gap-2 bg-stone-50/70 overflow-x-auto">
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
@@ -159,7 +193,7 @@ export const ItemPickerSheet: React.FC<ItemPickerSheetProps> = ({
         )}
 
         {/* Input Pencarian Lengket di Atas */}
-        <div className="sticky top-0 z-20 px-4 sm:px-5 py-2.5 bg-white border-b border-stone-100 shadow-2xs">
+        <div className="shrink-0 z-20 px-4 sm:px-5 py-2 bg-white border-b border-stone-100 shadow-2xs">
           <div className="relative flex items-center">
             <Search className="absolute left-3 w-4 h-4 text-stone-400 pointer-events-none" />
             <input
@@ -182,12 +216,12 @@ export const ItemPickerSheet: React.FC<ItemPickerSheetProps> = ({
           </div>
         </div>
 
-        {/* Daftar Item max-height 70vh scroll internal */}
-        <div className="overflow-y-auto max-h-[70vh] p-2 sm:p-3 divide-y divide-stone-100">
+        {/* Daftar Item scroll internal */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2 sm:p-3 divide-y divide-stone-100">
           {filteredItems.length === 0 ? (
-            <div className="py-12 px-4 text-center">
-              <div className="w-12 h-12 rounded-2xl bg-stone-100 text-stone-400 flex items-center justify-center mx-auto mb-2">
-                <Search className="w-6 h-6" />
+            <div className="py-8 px-4 text-center">
+              <div className="w-10 h-10 rounded-xl bg-stone-100 text-stone-400 flex items-center justify-center mx-auto mb-2">
+                <Search className="w-5 h-5" />
               </div>
               <p className="text-sm font-bold text-stone-800">Tidak ditemukan</p>
               <p className="text-xs text-stone-400 mt-1">
@@ -205,7 +239,7 @@ export const ItemPickerSheet: React.FC<ItemPickerSheetProps> = ({
                   type="button"
                   disabled={isDisabled}
                   onClick={() => handleSelect(item)}
-                  className={`w-full text-left px-3.5 py-3 rounded-xl transition flex items-center justify-between gap-3 min-h-[52px] ${
+                  className={`w-full text-left px-3 py-2.5 rounded-xl transition flex items-center justify-between gap-3 min-h-[46px] ${
                     isDisabled
                       ? 'bg-stone-50/70 text-stone-400 cursor-not-allowed opacity-60'
                       : 'hover:bg-orange-50/70 active:bg-orange-100/70 focus:bg-orange-50/70 cursor-pointer text-stone-800'
